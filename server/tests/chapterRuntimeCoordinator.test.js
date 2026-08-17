@@ -14,6 +14,20 @@ function createEmptyStream() {
   };
 }
 
+function createTestCoordinator(deps) {
+  return new ChapterRuntimeCoordinator({
+    humanizerService: {
+      humanize: async ({ content }) => ({
+        content,
+        changed: false,
+        originalLength: content.replace(/\s+/g, "").length,
+        finalLength: content.replace(/\s+/g, "").length,
+      }),
+    },
+    ...deps,
+  });
+}
+
 function createAssembledChapter() {
   return {
     novel: {
@@ -255,7 +269,7 @@ test("createChapterStream uses lightweight readiness without forcing execution c
     model: "gpt-test",
     temperature: 0.4,
   };
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     validateRequest: (input) => {
       calls.push("validate");
       return {
@@ -301,7 +315,7 @@ test("createChapterStream uses lightweight readiness without forcing execution c
 });
 
 test("finalizeChapterContent runs acceptance gate once and defers timeline extraction", async () => {
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     acceptanceAssessmentService: {
       assess: async () => {
         acceptanceCalls += 1;
@@ -449,7 +463,7 @@ test("finalizeChapterContent runs acceptance gate once and defers timeline extra
 test("finalizeChapterContent syncs accepted artifacts only after chapter reaches a stable review result", async () => {
   let acceptanceMode = "repairable";
   const syncCalls = [];
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     acceptanceAssessmentService: {
       assess: async () => ({
         assessment: {
@@ -614,7 +628,7 @@ test("finalizeChapterContent writes only acceptance-covered mustHitNow facts bef
     forbiddenReveal: null,
   }];
 
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     acceptanceAssessmentService: {
       assess: async () => ({
         assessment: {
@@ -756,7 +770,7 @@ test("createRepairStream escalates patch schema failures to a single heavy repai
   });
 
   try {
-    const coordinator = new ChapterRuntimeCoordinator({
+    const coordinator = createTestCoordinator({
       assembler: {
         assemble: async () => createRepairAssembledChapter(),
       },
@@ -840,7 +854,7 @@ test("createChapterStream does not block hot path on execution contract failure"
   };
 
   try {
-    const coordinator = new ChapterRuntimeCoordinator({
+    const coordinator = createTestCoordinator({
       validateRequest: (input) => input,
       ensureNovelCharacters: async () => undefined,
       ensureChapterExecutionContract: async () => {
@@ -881,7 +895,7 @@ test("createChapterStream blocks when state-driven decision requires review firs
   }];
   const statusCalls = [];
 
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     validateRequest: (input) => input,
     ensureNovelCharacters: async () => undefined,
     ensureChapterExecutionContract: async () => undefined,
@@ -914,7 +928,7 @@ test("createChapterStream lets full_book_autopilot continue past pending state p
   const statusCalls = [];
   const writerCalls = [];
 
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     validateRequest: (input) => input,
     ensureNovelCharacters: async () => undefined,
     ensureChapterExecutionContract: async () => undefined,
@@ -955,7 +969,7 @@ test("createChapterStream retries once before failing empty generated content", 
   const statusCalls = [];
   const finalized = [];
 
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     validateRequest: (input) => input,
     ensureNovelCharacters: async () => undefined,
     ensureChapterExecutionContract: async () => undefined,
@@ -1008,7 +1022,7 @@ test("runPipelineChapter does not leave a blocked chapter in generating status",
   }];
   const statusCalls = [];
 
-  const coordinator = new ChapterRuntimeCoordinator({
+  const coordinator = createTestCoordinator({
     validateRequest: (input) => input,
     ensureNovelCharacters: async () => undefined,
     ensureChapterExecutionContract: async () => undefined,

@@ -52,6 +52,7 @@
 - `PromptAsset.contextRequirements` 中声明的每个 required group 都必须能被默认 Context Broker 解析，或在真实调用路径中通过 fallback blocks 明确补齐。像 `chapter_boundary`、`structure_obligations` 这类审校必需上下文，不能只写在 prompt 文案或前端示例里，必须有后端 resolver / context block 产出路径。
 - Prompt Workbench 的官方版本库以代码注册的 `PromptAsset.slots` 为可信来源。官方当前版只能读取槽位默认值、hash、版本号和 changelog；不得把数据库里的自由编辑文本当作“官方 prompt”，也不得开放 schema、contextPolicy、required context、postValidate 或审批边界给用户覆盖。
 - 正文写作高级模板是受控专家能力，允许正式正文生成 Prompt 在明确的作品范围覆盖 `system` / `human` 模板。它服务成熟用户对正文写作表达和上下文摆放的精细控制，不改变 `PromptAsset.id/version/taskType/mode`、schema、postValidate、contextPolicy 或正文输出形态。
+- `novel.prose.humanizer_zh` 是所有持久化 AI 小说正文的只读后处理 Prompt。它来自 MIT 许可的 `op7418/humanizer-zh` 规则集，并增加小说事实保护、篇幅漂移校验和失败关闭；不得通过 Prompt Workbench 覆盖或绕过。
 - 正文写作高级模板的目标范围包括所有正式正文生成 Prompt，而不是永久限定在 `novel.chapter.writer`。长篇章节、短篇片段及后续新增的叙事正文 Prompt 都必须支持安全槽位编辑和高级 System / Human 模板编辑；尚未接入的 Prompt 属于能力缺口，应通过 PromptAsset 能力声明统一接入，不能继续在前端累加 Prompt ID 特判。
 - 正文 Prompt 必须把平台写法作为正式可观察上下文。平台写法控制节奏、段落、冲突与回报密度、关系线权重和结尾牵引，不得覆盖人物硬事实、世界规则、当前任务或已确认情节。完整规则见《平台写法配置与正文 Prompt 可编辑合同》。
 - 高级模板只能通过稳定 token 引用上下文、运行变量和槽位，例如 `{{context.chapter_mission}}`、`{{input.chapterTitle}}`、`{{slot.writer.tonePreference}}`。未知 token、未注册 context group 或非法 slot key 必须在预览或保存前被拦截，不能进入可启用版本。

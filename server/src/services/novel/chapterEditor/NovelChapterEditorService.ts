@@ -21,6 +21,7 @@ import {
 } from "../../../prompting/prompts/novel/chapterEditor/userIntent.prompts";
 import { buildChapterEditorDiffChunks } from "./chapterEditorDiff";
 import { ChapterEditorWorkspaceService } from "./ChapterEditorWorkspaceService";
+import { HumanizerZhService } from "../runtime/humanizer/HumanizerZhService";
 import {
   buildCharacterStateSummary,
   buildMacroContextSummary,
@@ -112,6 +113,7 @@ export class NovelChapterEditorService {
   constructor(
     private readonly workspaceService: ChapterEditorWorkspaceService = new ChapterEditorWorkspaceService(),
     private readonly promptRunner: typeof runStructuredPrompt = runStructuredPrompt,
+    private readonly humanizerService: Pick<HumanizerZhService, "humanize"> = new HumanizerZhService(),
   ) {}
 
   async previewAiRevision(
@@ -164,18 +166,33 @@ export class NovelChapterEditorService {
       },
     });
 
-    const candidates = dedupeCandidates(
-      result.output.candidates.slice(0, 3).map((candidate, index) => ({
+    const humanizedCandidates: ChapterEditorCandidate[] = [];
+    for (const [index, candidate] of result.output.candidates.slice(0, 3).entries()) {
+      const humanized = await this.humanizerService.humanize({
+        content: candidate.content,
+        scope: "long_chapter_repair",
+        novelId,
+        chapterId,
+        styleHint: context.styleSummary || undefined,
+        provider: input.provider ?? "deepseek",
+        model: input.model,
+        temperature: input.temperature,
+        stage: "chapter_editor_humanizer",
+        itemKey: `candidate:${index + 1}`,
+        entrypoint: "chapter_editor",
+      });
+      humanizedCandidates.push({
         id: randomUUID(),
         label: candidate.label?.trim() || `方案 ${index + 1}`,
-        content: candidate.content.trim(),
+        content: humanized.content,
         summary: candidate.summary?.trim() || null,
         rationale: candidate.rationale?.trim() || null,
         riskNotes: candidate.riskNotes?.filter((item) => item.trim().length > 0) ?? [],
         semanticTags: candidate.semanticTags?.filter((tag) => tag.trim().length > 0) ?? [],
-        diffChunks: buildChapterEditorDiffChunks(targetRange.text, candidate.content.trim()),
-      })),
-    );
+        diffChunks: buildChapterEditorDiffChunks(targetRange.text, humanized.content),
+      });
+    }
+    const candidates = dedupeCandidates(humanizedCandidates);
 
     if (candidates.length < 2) {
       throw new Error("AI 未返回足够的候选版本，请重试。");

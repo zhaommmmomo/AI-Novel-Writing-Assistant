@@ -422,6 +422,10 @@ export const promptAssetLoaderEntries: PromptAssetLoaderEntry[] = [
     load: () => require("../prompts/novel/chapterWriter.prompts").chapterWriterPrompt as UnknownPromptAsset,
   },
   {
+    key: "novel.prose.humanizer_zh@v1",
+    load: () => require("../prompts/novel/humanizer/humanizerZh.prompts").humanizerZhPrompt as UnknownPromptAsset,
+  },
+  {
     key: "novel.timeline.extractor@v1",
     load: () => require("../prompts/novel/timelineExtractor.prompts").timelineExtractorPrompt as UnknownPromptAsset,
   },

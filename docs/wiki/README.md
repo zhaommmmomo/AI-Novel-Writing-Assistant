@@ -17,6 +17,7 @@ Wiki 不记录单次提交改了什么，也不替代 release notes。它只记�
 
 - [模块边界与文档治理](./architecture/module-boundaries.md)
 - [当前模型选择与厂商默认模型边界](./architecture/model-selection.md)
+- [Codex CLI 文本模型适配边界](./architecture/codex-cli-provider.md)
 - [配置项归属与可见性规范](./architecture/configuration-conventions.md)
 
 ### Workflows

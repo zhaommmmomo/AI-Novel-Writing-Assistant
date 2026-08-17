@@ -69,13 +69,13 @@ export default function StageModelRun({
 
         <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
-            <div className="text-sm font-medium text-foreground">正文后去 AI 检测与修正</div>
+            <div className="text-sm font-medium text-foreground">额外 AI 味检测与修正</div>
             <div className={`text-xs leading-5 text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
-              开启后，章节正文生成完成时会检测 AI 味风险，并在命中可修正问题时生成修订稿。
+              Humanizer 基础处理始终执行；开启后还会按本书规则检测 AI 味风险，并生成必要的修订稿。
             </div>
           </div>
           <Switch
-            aria-label="正文后去 AI 检测与修正"
+            aria-label="额外 AI 味检测与修正"
             checked={basicForm.postGenerationStyleReviewEnabled}
             onCheckedChange={(checked) => onBasicFormChange({ postGenerationStyleReviewEnabled: checked })}
           />

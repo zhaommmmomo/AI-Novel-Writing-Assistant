@@ -18,6 +18,7 @@ import {
   buildProseQualityAuditReport,
   detectProseQuality,
 } from "./proseQuality/ProseQualityDetector";
+import { HumanizerZhService } from "./humanizer/HumanizerZhService";
 
 export interface ChapterContentFinalizationAgentRuntime {
   finishChapterGenRun: (runId: string, summary: string, durationMs: number) => Promise<void>;
@@ -25,9 +26,10 @@ export interface ChapterContentFinalizationAgentRuntime {
 
 export interface ChapterContentFinalizationServiceDeps {
   qualityGateService: Pick<ChapterQualityGateService, "runAcceptanceGateOnly">;
-  artifactSyncService: Pick<ChapterArtifactSyncService, "syncChapterArtifacts">;
+  artifactSyncService: Pick<ChapterArtifactSyncService, "saveDraftAndArtifacts" | "syncChapterArtifacts">;
   plannerService: ChapterRuntimePlannerPort;
   agentRuntime: ChapterContentFinalizationAgentRuntime;
+  humanizerService: Pick<HumanizerZhService, "humanize">;
 }
 
 export interface FinalizeChapterContentInput {
@@ -51,19 +53,59 @@ export interface FinalizeChapterContentResult {
 
 export class ChapterContentFinalizationService {
   private readonly qualityGateService: Pick<ChapterQualityGateService, "runAcceptanceGateOnly">;
-  private readonly artifactSyncService: Pick<ChapterArtifactSyncService, "syncChapterArtifacts">;
+  private readonly artifactSyncService: Pick<
+    ChapterArtifactSyncService,
+    "saveDraftAndArtifacts" | "syncChapterArtifacts"
+  >;
   private readonly plannerService: ChapterRuntimePlannerPort;
   private readonly agentRuntime: ChapterContentFinalizationAgentRuntime;
+  private readonly humanizerService: Pick<HumanizerZhService, "humanize">;
 
   constructor(deps: ChapterContentFinalizationServiceDeps) {
     this.qualityGateService = deps.qualityGateService;
     this.artifactSyncService = deps.artifactSyncService;
     this.plannerService = deps.plannerService;
     this.agentRuntime = deps.agentRuntime;
+    this.humanizerService = deps.humanizerService;
   }
 
   async finalizeChapterContent(input: FinalizeChapterContentInput): Promise<FinalizeChapterContentResult> {
-    const finalContent = input.content;
+    let humanized: Awaited<ReturnType<HumanizerZhService["humanize"]>>;
+    try {
+      humanized = await this.humanizerService.humanize({
+        content: input.content,
+        scope: "long_chapter",
+        novelId: input.novelId,
+        chapterId: input.chapterId,
+        taskStyleProfileId: input.request.taskStyleProfileId,
+        provider: input.request.provider,
+        model: input.request.model,
+        temperature: input.request.temperature,
+        stage: "chapter_humanizer",
+        itemKey: `chapter:${input.contextPackage.chapter.order}`,
+        entrypoint: "chapter_runtime",
+      });
+    } catch (error) {
+      await this.markChapterStatus(input.chapterId, "needs_repair").catch(() => undefined);
+      throw error;
+    }
+    const finalContent = humanized.content;
+    if (humanized.changed) {
+      await this.artifactSyncService.saveDraftAndArtifacts(
+        input.novelId,
+        input.chapterId,
+        finalContent,
+        "repaired",
+        {
+          scheduleBackgroundSync: false,
+          artifactSyncMode: input.request.artifactSyncMode,
+          syncArtifacts: false,
+          provider: input.request.provider,
+          model: input.request.model,
+          temperature: input.request.temperature,
+        },
+      );
+    }
     const { acceptance, timelineGate } = await this.qualityGateService.runAcceptanceGateOnly({
       novelId: input.novelId,
       chapterId: input.chapterId,
@@ -87,8 +129,8 @@ export class ChapterContentFinalizationService {
     };
     const styleReview: StyleReviewResult = {
       report: null,
-      autoRewritten: false,
-      originalContent: null,
+      autoRewritten: humanized.changed,
+      originalContent: humanized.changed ? input.content : null,
       finalContent,
     };
     const activeOpenConflicts = await openConflictService.listOpenConflicts(input.novelId, {

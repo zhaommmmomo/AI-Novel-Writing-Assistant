@@ -27,6 +27,9 @@ function getBalanceSummary(input: {
   isBalanceLoading: boolean;
 }) {
   const { provider, balance, isBalanceLoading } = input;
+  if (provider.provider === "codex") {
+    return "复用本机 Codex 登录，不需要单独查询 API 余额。";
+  }
   if (provider.kind === "custom") {
     return "自定义厂商暂不接入余额查询。";
   }
@@ -65,8 +68,8 @@ export default function ProviderStatusCard(props: {
     : "不支持图像生成";
   const visibleModels = modelsOpen ? provider.models : provider.models.slice(0, 8);
   const canUseProvider = provider.isConfigured && provider.isActive && Boolean(provider.currentModel);
-  const testDisabledReason = provider.isConfigured ? "" : "配置 API Key 后可以测试连接。";
-  const refreshDisabledReason = provider.isConfigured ? "" : "配置 API Key 后可以刷新模型列表。";
+  const testDisabledReason = provider.isConfigured ? "" : "完成模型配置后可以测试连接。";
+  const refreshDisabledReason = provider.isConfigured ? "" : "完成模型配置后可以刷新模型列表。";
 
   return (
     <div
@@ -175,13 +178,15 @@ export default function ProviderStatusCard(props: {
       {advancedOpen ? (
         <div className="mt-3 space-y-3">
           <div className={`text-xs text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
-            API 地址：{provider.currentBaseURL || "-"}
+            {provider.provider === "codex"
+              ? "连接方式：本机 Codex CLI"
+              : `API 地址：${provider.currentBaseURL || "-"}`}
           </div>
           <ProviderRequestLimitSummary
             concurrencyLimit={provider.concurrencyLimit}
             requestIntervalMs={provider.requestIntervalMs}
           />
-          <div className="flex flex-col gap-3 rounded-md border bg-background/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+          {provider.provider !== "codex" ? <div className="flex flex-col gap-3 rounded-md border bg-background/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-1">
               <div className="text-xs font-medium text-muted-foreground">思考功能</div>
               <div className={`text-xs text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
@@ -198,7 +203,7 @@ export default function ProviderStatusCard(props: {
                 onCheckedChange={(checked) => onToggleReasoning(provider.provider, checked)}
               />
             </div>
-          </div>
+          </div> : null}
 
           <div className="rounded-md border border-dashed bg-background/60 p-3">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -207,7 +212,11 @@ export default function ProviderStatusCard(props: {
                 <Badge variant="outline">最近刷新 {formatBalanceTime(balance.fetchedAt)}</Badge>
               ) : null}
             </div>
-            {provider.kind === "custom" ? (
+            {provider.provider === "codex" ? (
+              <div className={`text-sm text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
+                Codex 使用 ChatGPT 登录或本机配置的 Codex Proxy，不提供 API 余额查询。
+              </div>
+            ) : provider.kind === "custom" ? (
               <div className={`text-sm text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
                 自定义 OpenAI 兼容厂商暂不接入余额查询。
               </div>

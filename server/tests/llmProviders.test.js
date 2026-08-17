@@ -14,14 +14,14 @@ const {
   selectStructuredOutputStrategy,
 } = require("../dist/llm/structuredOutput.js");
 
-test("supported providers include kimi, minimax, glm, qwen, gemini and ollama", () => {
-  for (const provider of ["kimi", "minimax", "glm", "qwen", "gemini", "ollama"]) {
+test("supported providers include kimi, minimax, glm, qwen, gemini, codex and ollama", () => {
+  for (const provider of ["kimi", "minimax", "glm", "qwen", "gemini", "codex", "ollama"]) {
     assert.ok(SUPPORTED_PROVIDERS.includes(provider), `${provider} should be available`);
   }
 });
 
 test("new provider defaults are present in their model fallback lists", () => {
-  for (const provider of ["kimi", "minimax", "glm", "qwen", "gemini", "ollama"]) {
+  for (const provider of ["kimi", "minimax", "glm", "qwen", "gemini", "codex", "ollama"]) {
     assert.ok(
       PROVIDERS[provider].models.includes(PROVIDERS[provider].defaultModel),
       `${provider} default model should exist in fallback models`,
@@ -51,6 +51,20 @@ test("ollama does not advertise forced json mode", () => {
   const capability = getJsonCapability("ollama", "llama3.2");
   assert.equal(capability.supportsJsonObject, false);
   assert.equal(capability.supportsJsonSchema, false);
+});
+
+test("codex CLI requires no API key and supports schema output through app-server", async () => {
+  assert.equal(PROVIDERS.codex.requiresApiKey, false);
+  assert.equal(PROVIDERS.codex.defaultModel, "gpt-5.6-sol");
+  const profile = resolveStructuredOutputProfile({
+    provider: "codex",
+    model: "gpt-5.6-sol",
+    baseURL: "codex-cli://local",
+    executionMode: "structured",
+  });
+  assert.equal(profile.family, "codex_cli");
+  assert.equal(profile.nativeJsonSchema, true);
+  assert.equal(profile.preferredStructuredStrategy, "json_schema");
 });
 
 test("minimax clamps temperature into supported range", () => {

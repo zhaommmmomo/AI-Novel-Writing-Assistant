@@ -2,6 +2,7 @@ import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { ChatOpenAI } from "@langchain/openai";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
+import { getCodexCliProxyConnection } from "../platform/llm/codex";
 import { secretStore } from "../services/settings/secretStore";
 import { resolveModelTemperature } from "./capabilities";
 import { createAnthropicLLM } from "./anthropicClient";
@@ -245,7 +246,7 @@ export async function resolveLLMClientOptions(
   const providerName = isBuiltInProvider(resolvedProvider)
     ? PROVIDERS[resolvedProvider].name
     : dbSecret?.displayName ?? resolvedProvider;
-  const apiKey = normalizeOptionalText(options.apiKey)
+  let apiKey = normalizeOptionalText(options.apiKey)
     ?? dbSecret?.key
     ?? getProviderEnvApiKey(resolvedProvider);
 
@@ -261,18 +262,24 @@ export async function resolveLLMClientOptions(
     throw new Error(`未配置 ${providerName} 的默认模型。`);
   }
 
-  const baseURL = resolveProviderBaseUrl(
+  let baseURL = resolveProviderBaseUrl(
     resolvedProvider,
     options.baseURL ?? dbSecret?.baseURL,
     dbSecret?.baseURL,
   );
+  if (resolvedProvider === "codex") {
+    const connection = await getCodexCliProxyConnection();
+    apiKey = connection.apiKey;
+    baseURL = connection.baseURL;
+  }
   if (!baseURL) {
     throw new Error(`未配置 ${providerName} 的 API URL。`);
   }
 
   const temperature = resolveModelTemperature(resolvedProvider, model, resolvedTemperature);
   const timeoutMs = normalizeOptionalTimeoutMs(options.timeoutMs);
-  const concurrencyLimit = normalizeLimitValue(dbSecret?.concurrencyLimit);
+  const concurrencyLimit = normalizeLimitValue(dbSecret?.concurrencyLimit)
+    || (resolvedProvider === "codex" ? 1 : 0);
   const requestIntervalMs = normalizeLimitValue(dbSecret?.requestIntervalMs);
   const requestProtocol = options.requestProtocol === "anthropic" ? "anthropic" : "openai_compatible";
   const structuredStrategy = options.structuredStrategy;

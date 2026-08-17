@@ -10,7 +10,7 @@ export interface ProviderConfig {
   baseURL: string;
   defaultModel: string;
   models: string[];
-  envKey: string;
+  envKey?: string;
   envBaseURLKey?: string;
   envModelKey?: string;
   maxTokens?: number;
@@ -140,9 +140,19 @@ export const PROVIDERS: Record<BuiltinLLMProvider, ProviderConfig> = {
     envModelKey: "OLLAMA_MODEL",
     requiresApiKey: false,
   },
+  codex: {
+    name: "Codex CLI",
+    baseURL: "codex-cli://local",
+    defaultModel: "gpt-5.6-sol",
+    models: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"],
+    envModelKey: "CODEX_CLI_MODEL",
+    requiresApiKey: false,
+  },
 };
 
 export const SUPPORTED_PROVIDERS: BuiltinLLMProvider[] = [...LLM_PROVIDERS];
+export const SUPPORTED_EMBEDDING_PROVIDERS: BuiltinLLMProvider[] = SUPPORTED_PROVIDERS
+  .filter((provider) => provider !== "codex");
 
 export function isBuiltInProvider(provider: string): provider is BuiltinLLMProvider {
   return isBuiltinLLMProvider(provider);
@@ -157,6 +167,9 @@ export function getProviderEnvApiKey(provider: LLMProvider): string | undefined 
     return undefined;
   }
   const envKey = PROVIDERS[provider].envKey;
+  if (!envKey) {
+    return undefined;
+  }
   const value = process.env[envKey];
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

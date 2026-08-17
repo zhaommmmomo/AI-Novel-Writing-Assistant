@@ -63,11 +63,14 @@ export default function ProviderConfigDialog({
   deleteDisabled,
   deleteLabel,
 }: ProviderConfigDialogProps) {
+  const isCodexDialog = editingConfig?.provider === "codex";
   const primaryModelLabel = isCreatingCustomProvider ? "默认模型（可选）" : isCustomDialog ? "默认模型" : "模型名称";
   const canSelectListedModels = selectableModels.length > 0;
   const imageModelOptions = editingConfig?.imageModels ?? [];
   const canSelectImageModels = imageModelOptions.length > 0;
-  const modelGuidance = editingConfig?.provider === "deepseek"
+  const modelGuidance = isCodexDialog
+    ? "模型列表来自本机 Codex CLI；选择后，文本生成会复用 Codex 的登录状态。"
+    : editingConfig?.provider === "deepseek"
     ? "推荐使用 DeepSeek V4 Flash，兼顾中文长篇质量与响应速度；也可以选择其他可用模型。"
     : isCreatingCustomProvider
       ? "获取模型列表后会自动填入第一个可用模型；接口不返回列表时，可以手动填写。"
@@ -121,25 +124,31 @@ export default function ProviderConfigDialog({
             </div>
           ) : null}
 
-          {(isCustomDialog || editingConfig?.requiresApiKey === false) ? (
+          {isCodexDialog ? (
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
+              使用本机 Codex CLI 登录，不需要填写 API Key 或 API 地址。Codex 只用于文本生成，不提供图片和向量模型。
+            </div>
+          ) : (isCustomDialog || editingConfig?.requiresApiKey === false) ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               API Key 可以留空；填写 API 地址后可获取模型列表，系统会选择一个默认模型。
             </div>
           ) : null}
 
-          <Input
-            type="password"
-            value={form.key}
-            placeholder={editingConfig?.isConfigured ? "留空则沿用保存的 API Key" : "输入 API Key"}
-            onChange={(event) => {
-              setForm((prev) => ({ ...prev, key: event.target.value }));
-              if (isCreatingCustomProvider) {
-                onClearPreviewModels();
-              }
-            }}
-          />
+          {!isCodexDialog ? (
+            <Input
+              type="password"
+              value={form.key}
+              placeholder={editingConfig?.isConfigured ? "留空则沿用保存的 API Key" : "输入 API Key"}
+              onChange={(event) => {
+                setForm((prev) => ({ ...prev, key: event.target.value }));
+                if (isCreatingCustomProvider) {
+                  onClearPreviewModels();
+                }
+              }}
+            />
+          ) : null}
 
-          <div className="space-y-1">
+          {!isCodexDialog ? <div className="space-y-1">
             <div className="text-xs text-muted-foreground">API 地址</div>
             <Input
               value={form.baseURL}
@@ -160,7 +169,7 @@ export default function ProviderConfigDialog({
                 ? "填写 OpenAI 兼容 API 地址，通常以 /v1 结尾；本地 Ollama 常见地址是 http://127.0.0.1:11434/v1。"
                 : "留空会使用默认地址；本地 Ollama 常见地址是 http://127.0.0.1:11434/v1。"}
             </div>
-          </div>
+          </div> : null}
 
           {isCreatingCustomProvider ? (
             <div className="space-y-2">
@@ -205,7 +214,7 @@ export default function ProviderConfigDialog({
             onChange={(event) => setForm((prev) => ({ ...prev, model: event.target.value }))}
           />
 
-          <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+          {!isCodexDialog ? <div className="space-y-3 rounded-md border bg-muted/20 p-3">
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">图像模型（可选）</div>
               <div className="text-xs text-muted-foreground">
@@ -232,7 +241,7 @@ export default function ProviderConfigDialog({
             <div className="text-xs text-muted-foreground">
               图片生成会调用这个厂商的 OpenAI 兼容图像接口。
             </div>
-          </div>
+          </div> : null}
 
           <ProviderRequestLimitFields
             concurrencyLimit={form.concurrencyLimit}
