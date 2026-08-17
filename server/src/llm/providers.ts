@@ -143,7 +143,7 @@ export const PROVIDERS: Record<BuiltinLLMProvider, ProviderConfig> = {
   codex: {
     name: "Codex CLI",
     baseURL: "codex-cli://local",
-    defaultModel: "gpt-5.4",
+    defaultModel: "gpt-5.6-sol",
     models: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.5", "gpt-5.4", "gpt-5.4-mini"],
     envModelKey: "CODEX_CLI_MODEL",
     requiresApiKey: false,

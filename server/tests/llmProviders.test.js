@@ -55,9 +55,10 @@ test("ollama does not advertise forced json mode", () => {
 
 test("codex CLI requires no API key and supports schema output through app-server", async () => {
   assert.equal(PROVIDERS.codex.requiresApiKey, false);
+  assert.equal(PROVIDERS.codex.defaultModel, "gpt-5.6-sol");
   const profile = resolveStructuredOutputProfile({
     provider: "codex",
-    model: "gpt-5.4",
+    model: "gpt-5.6-sol",
     baseURL: "codex-cli://local",
     executionMode: "structured",
   });

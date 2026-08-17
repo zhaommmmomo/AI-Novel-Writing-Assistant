@@ -16,6 +16,7 @@ Codex 作为内置文本厂商接入，但不直接改写每条业务调用链�
 
 - 内置 provider id 固定为 `codex`，只用于文本生成，不参与图片生成或 Embedding/RAG 厂商列表。
 - 默认通过 `CODEX_CLI_MODEL_PROVIDER=openai` 强制使用 Codex 的 ChatGPT 登录。需要使用本机已有的公司 Codex Proxy 时，可把该启动参数改为对应的 Codex model provider 名称；项目本身不读取或保存 Proxy 密钥。
+- 默认模型为 `gpt-5.6-sol`，默认推理强度为 `max`。`ultra` 会额外启用自动任务委派，不作为小说生成默认值。
 - `CODEX_CLI_PATH` 只接受规范化绝对路径。未设置时通过无 shell 的进程调用执行 `codex`，禁止把用户输入拼进命令字符串。
 - 本地 OpenAI 兼容端点只绑定回环地址，并使用每次服务启动随机生成的内存令牌。令牌不写入数据库、日志、env 或前端。
 - Codex thread 使用只读 sandbox、`approvalPolicy=never`、空 workspace roots、空 environments、空 dynamic tools，并通过基础指令禁止工具、命令、文件和网络访问。
@@ -35,6 +36,7 @@ Codex 作为内置文本厂商接入，但不直接改写每条业务调用链�
 
 - **设置页显示 Codex，但连接测试失败**：先运行 `codex --version` 与 `codex login status`，再检查 `CODEX_CLI_PATH` 和 `CODEX_CLI_MODEL_PROVIDER`。
 - **模型不存在**：在厂商卡片刷新模型目录，选择 `model/list` 当前返回的模型，不要依赖旧的静态候选。
+- **推理强度不生效**：检查 `CODEX_CLI_REASONING_EFFORT`；支持值为 `low`、`medium`、`high`、`xhigh`、`max`、`ultra`，小说默认使用 `max`。
 - **公司 Proxy 在 CLI 可用、工作台不可用**：确认启动服务的 shell 或桌面进程能获得 Proxy 所需环境变量；项目不会从其他文件复制密钥。
 - **JSON 结果不稳定**：确认模型路由使用 `json_schema`，并检查 app-server 版本是否支持 `turn/start.outputSchema`。
 - **长链路速度较慢**：先确认 Codex 厂商并发限制。提高并发前应观察订阅限流和 app-server 稳定性。

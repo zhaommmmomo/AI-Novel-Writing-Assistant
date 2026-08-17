@@ -42,6 +42,7 @@ interface ProtocolResponse {
 const REQUEST_TIMEOUT_MS = 30_000;
 const INITIALIZE_TIMEOUT_MS = 20_000;
 const MODEL_PROVIDER_PATTERN = /^[a-zA-Z0-9._-]+$/u;
+const REASONING_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
 const BASE_INSTRUCTIONS = [
   "You are the text-generation backend for an AI novel-writing application.",
   "Return only the requested assistant content.",
@@ -92,6 +93,14 @@ function resolveModelProvider(): string {
   return configured;
 }
 
+function resolveReasoningEffort(): string {
+  const configured = process.env.CODEX_CLI_REASONING_EFFORT?.trim().toLowerCase() || "max";
+  if (!REASONING_EFFORTS.has(configured)) {
+    throw new Error("CODEX_CLI_REASONING_EFFORT 必须是 low、medium、high、xhigh、max 或 ultra。");
+  }
+  return configured;
+}
+
 function protocolErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") {
     return "Codex app-server 返回未知错误。";
@@ -112,6 +121,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
   private readonly diagnostics: string[] = [];
   private readonly workingDirectory = mkdtempSync(join(tmpdir(), "ai-novel-codex-"));
   private readonly modelProvider = resolveModelProvider();
+  private readonly reasoningEffort = resolveReasoningEffort();
   private closing = false;
 
   async listModels(): Promise<CodexModelDescriptor[]> {
@@ -209,6 +219,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
         environments: [],
         approvalPolicy: "never",
         model: request.model,
+        effort: this.reasoningEffort,
         ...(request.outputSchema ? { outputSchema: request.outputSchema } : {}),
       }).then((value) => {
         const turnId = (value as { turn?: { id?: unknown } })?.turn?.id;
