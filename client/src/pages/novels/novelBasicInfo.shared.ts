@@ -227,7 +227,7 @@ export const BASIC_INFO_FIELD_HINTS = {
   pacePreference: "决定章节规划时是偏铺垫还是偏推进，会影响场景密度和钩子强度。",
   emotionIntensity: "决定后续生成时情绪爆发和冲突的频率，不是越高越好。",
   aiFreedom: "决定 AI 可以偏离既有规划和设定的程度。前期建议保持低或中。",
-  postGenerationStyleReviewEnabled: "控制正文生成后的去 AI 味检测与自动修正。生成前的写法和反 AI 提示仍按规则库执行。",
+  postGenerationStyleReviewEnabled: "所有 AI 正文都会经过 Humanizer 基础处理；这个开关控制是否继续执行额外的 AI 味检测和自动修正。",
   defaultChapterLength: "这是章节规划和生成时的参考字数，不是硬限制。常见推荐值是 2500 到 3500。",
   estimatedChapterCount: "这是项目预估的总章节数，会作为结构化大纲、剧情拍点和流水线默认范围的参考，不是硬限制。",
   resourceReadyScore: "用于标记设定、角色、主线资料是否充分。数值越高，越适合进入自动化生产阶段。",

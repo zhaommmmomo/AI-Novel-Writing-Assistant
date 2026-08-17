@@ -77,5 +77,5 @@ export function summarizeModelRunStage(input: {
   postGenerationStyleReviewEnabled: boolean;
 }): string {
   const runModeLabel = input.runModeOptions.find((option) => option.value === input.runMode)?.label ?? input.runMode;
-  return `${runModeLabel} · ${input.postGenerationStyleReviewEnabled ? "正文后检测 AI 味" : "不做正文后 AI 味检测"}`;
+  return `${runModeLabel} · Humanizer 固定执行 · ${input.postGenerationStyleReviewEnabled ? "追加 AI 味检测" : "不追加 AI 味检测"}`;
 }

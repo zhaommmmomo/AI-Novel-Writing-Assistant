@@ -26,6 +26,7 @@ import {
   defaultChapterRuntimeAgent,
   type ChapterRuntimeAgentPort,
 } from "./ChapterRuntimeDefaultDeps";
+import { HumanizerZhService } from "./humanizer/HumanizerZhService";
 
 interface ChapterRuntimeCoordinatorDeps {
   assembler?: Pick<GenerationContextAssembler, "assemble">;
@@ -49,6 +50,7 @@ interface ChapterRuntimeCoordinatorDeps {
     options: ReviewOptions,
   ) => Promise<{ score: QualityScore; issues: ReviewIssue[] }>;
   resolveAuditIssues?: (novelId: string, issueIds: string[]) => Promise<unknown>;
+  humanizerService?: Pick<HumanizerZhService, "humanize">;
 }
 
 export class ChapterRuntimeCoordinator {
@@ -68,6 +70,7 @@ export class ChapterRuntimeCoordinator {
     const reviewChapterAfterRepair = deps.reviewChapterAfterRepair ?? createDefaultReviewChapterAfterRepair();
     const ensureNovelCharacters = deps.ensureNovelCharacters ?? this.ensureNovelCharacters.bind(this);
     const validateRequest = deps.validateRequest ?? ((input) => chapterRuntimeRequestSchema.parse(input));
+    const humanizerService = deps.humanizerService ?? new HumanizerZhService();
 
     this.qualityGateService = new ChapterQualityGateService({
       acceptanceAssessmentService,
@@ -78,6 +81,7 @@ export class ChapterRuntimeCoordinator {
       artifactSyncService,
       plannerService: plannerRuntime,
       agentRuntime,
+      humanizerService,
     });
     this.streamOrchestrator = new ChapterStreamGenerationOrchestrator({
       assembler,
@@ -99,6 +103,7 @@ export class ChapterRuntimeCoordinator {
       artifactSyncService,
       reviewChapterAfterRepair,
       resolveAuditIssues: deps.resolveAuditIssues,
+      humanizerService,
     });
   }
 

@@ -13,3 +13,9 @@ similar services to third parties.
 
 Please comply with the open-source license terms and obtain the appropriate
 authorization where applicable.
+
+Third-party prompt guidance:
+
+- humanizer-zh, copyright (c) 2026 歸藏, licensed under the MIT License.
+  Source: https://github.com/op7418/humanizer-zh
+  The license text is available at third_party/humanizer-zh/LICENSE.

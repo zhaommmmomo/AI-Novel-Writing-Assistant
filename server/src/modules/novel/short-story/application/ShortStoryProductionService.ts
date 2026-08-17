@@ -13,6 +13,7 @@ import {
   shortStorySegmentWritePrompt,
 } from "../../../../prompting/prompts/shortStory/shortStory.prompts";
 import { NovelWorkflowService } from "../../../../services/novel/workflow/NovelWorkflowService";
+import { HumanizerZhService } from "../../../../services/novel/runtime/humanizer/HumanizerZhService";
 import {
   buildShortStoryWriterContextBlocks,
   parseWritingPlatformSnapshot,
@@ -42,6 +43,11 @@ function countWords(content: string): number {
 export class ShortStoryProductionService {
   private readonly running = new Set<string>();
   private readonly workflowService = new NovelWorkflowService();
+  private readonly humanizerService: Pick<HumanizerZhService, "humanize">;
+
+  constructor(deps: { humanizerService?: Pick<HumanizerZhService, "humanize"> } = {}) {
+    this.humanizerService = deps.humanizerService ?? new HumanizerZhService();
+  }
 
   schedule(taskId: string): void {
     setImmediate(() => {
@@ -278,22 +284,32 @@ export class ShortStoryProductionService {
             maxTokens: Math.min(12000, Math.max(2500, segmentPlan.targetWordCount * 2)),
           },
         });
+        const humanized = await this.humanizerService.humanize({
+          content: generated.output.content,
+          scope: "short_story_segment",
+          novelId: context.novel.id,
+          styleHint: context.novel.styleTone ?? context.intent.direction.styleKeywords.join("、"),
+          taskId: context.task.id,
+          stage: "short_story_humanizer",
+          itemKey: `segment:${row.order}`,
+          entrypoint: "creation_studio",
+        });
         const saved = await prisma.shortStorySegment.updateMany({
           where: { id: row.id, userEditedAt: null },
           data: {
-            content: generated.output.content.trim(),
+            content: humanized.content,
             status: "completed",
             version: { increment: 1 },
             generatedAt: new Date(),
             qualityResultJson: JSON.stringify({
               continuitySummary: generated.output.continuitySummary,
-              wordCount: countWords(generated.output.content),
+              wordCount: countWords(humanized.content),
             }),
           },
         });
         if (saved.count > 0) {
           previousContinuity = generated.output.continuitySummary;
-          previousContentTail = generated.output.content.slice(-1800);
+          previousContentTail = humanized.content.slice(-1800);
         }
       } catch (error) {
         await prisma.shortStorySegment.update({
@@ -427,10 +443,20 @@ export class ShortStoryProductionService {
     for (const patch of repaired.output.patches) {
       const target = segments.find((segment) => segment.order === patch.segmentOrder);
       if (!target || target.userEditedAt) continue;
+      const humanized = await this.humanizerService.humanize({
+        content: patch.content,
+        scope: "short_story_repair",
+        novelId: context.novel.id,
+        styleHint: context.novel.styleTone ?? context.intent.direction.styleKeywords.join("、"),
+        taskId: context.task.id,
+        stage: "short_story_humanizer",
+        itemKey: `repair:${target.order}`,
+        entrypoint: "creation_studio",
+      });
       await prisma.shortStorySegment.updateMany({
         where: { id: target.id, version: target.version, userEditedAt: null },
         data: {
-          content: patch.content.trim(),
+          content: humanized.content,
           version: { increment: 1 },
           generatedAt: new Date(),
           qualityResultJson: JSON.stringify({ repairedFromAudit: true }),

@@ -22,6 +22,7 @@ import {
   createHeavyRepairPromptExecution,
   prepareChapterRepairExecution,
 } from "./chapterRepairRuntime";
+import type { HumanizerZhService } from "../humanizer/HumanizerZhService";
 
 interface RepairReviewResult {
   score: QualityScore;
@@ -31,6 +32,7 @@ interface RepairReviewResult {
 export interface ChapterRepairStreamRuntimeDeps {
   assembler?: Pick<GenerationContextAssembler, "assemble">;
   artifactSyncService: Pick<ChapterArtifactSyncService, "syncChapterArtifacts">;
+  humanizerService: Pick<HumanizerZhService, "humanize">;
   reviewChapterAfterRepair: (
     novelId: string,
     chapterId: string,
@@ -177,7 +179,20 @@ export class ChapterRepairStreamRuntime {
       message: "修复稿已生成，正在保存正文并重新审校。",
     });
 
-    const repairedContent = input.content.trim();
+    const generatedRepairContent = input.content.trim();
+    const humanized = await this.deps.humanizerService.humanize({
+      content: generatedRepairContent,
+      scope: "long_chapter_repair",
+      novelId: input.novelId,
+      chapterId: input.chapterId,
+      provider: input.options.provider,
+      model: input.options.model,
+      temperature: input.options.temperature,
+      stage: "chapter_humanizer",
+      itemKey: `repair:${input.chapterId}`,
+      entrypoint: "chapter_repair",
+    });
+    const repairedContent = humanized.content.trim();
     if (!repairedContent) {
       throw new ChapterPatchRepairFailedError("修复结果为空，未保存章节正文。");
     }

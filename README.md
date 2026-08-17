@@ -152,6 +152,7 @@
 - 模型设置新增 Codex CLI，可直接复用本机 Codex 的 ChatGPT 登录，不需要填写模型 API Key。
 - Codex 可用于自动导演、正文生成、审阅和结构化规划；默认使用 `gpt-5.6-sol` 与 `max` 推理强度，并限制为单并发以提高长链路稳定性。
 - Codex 仅作为文本模型使用，不会被错误列入图片生成或知识库向量模型。
+- 长篇章节、章节修复、章节编辑器 AI 改写候选、短篇片段和短篇 AI 修订都会强制经过 Humanizer-zh，减少模板句、总结腔、机械排比和聊天痕迹，同时保护剧情事实与人物关系。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 

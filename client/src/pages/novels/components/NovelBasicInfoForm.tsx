@@ -444,15 +444,15 @@ export default function NovelBasicInfoForm(props: NovelBasicInfoFormProps) {
             <div className="flex flex-col gap-3 py-1 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
                 <FieldLabel htmlFor="basic-post-generation-style-review" hint={BASIC_INFO_FIELD_HINTS.postGenerationStyleReviewEnabled}>
-                  正文后去 AI 检测与修正
+                  额外 AI 味检测与修正
                 </FieldLabel>
                 <div className="text-xs leading-5 text-muted-foreground">
-                  开启后，章节正文生成完成时会检测 AI 味风险，并在命中可修正问题时生成修订稿。
+                  Humanizer 基础处理始终执行；开启后还会按本书规则检测 AI 味风险，并生成必要的修订稿。
                 </div>
               </div>
               <Switch
                 id="basic-post-generation-style-review"
-                aria-label="正文后去 AI 检测与修正"
+                aria-label="额外 AI 味检测与修正"
                 checked={basicForm.postGenerationStyleReviewEnabled}
                 onCheckedChange={(checked) => onFormChange({ postGenerationStyleReviewEnabled: checked })}
               />

@@ -252,6 +252,14 @@ test("NovelChapterEditorService previewRewrite returns compatibility payload and
       }
       throw new Error(`Unexpected asset: ${asset.id}`);
     },
+    {
+      humanize: async ({ content }) => ({
+        content,
+        changed: false,
+        originalLength: content.length,
+        finalLength: content.length,
+      }),
+    },
   );
 
   const result = await service.previewRewrite("novel-1", "chapter-1", {
@@ -337,6 +345,14 @@ test("NovelChapterEditorService previewAiRevision supports freeform whole-chapte
         };
       }
       throw new Error(`Unexpected asset: ${asset.id}`);
+    },
+    {
+      humanize: async ({ content }) => ({
+        content,
+        changed: false,
+        originalLength: content.length,
+        finalLength: content.length,
+      }),
     },
   );
 
