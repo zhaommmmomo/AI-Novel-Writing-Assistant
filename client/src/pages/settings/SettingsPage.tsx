@@ -399,6 +399,8 @@ export default function SettingsPage() {
     || (!isCustomDialog && editingConfig?.requiresApiKey !== false && !form.key.trim() && !editingConfig?.isConfigured);
   const providerSubmitLabel = isSavingProvider ? "保存中..." : isCreatingCustomProvider ? "创建厂商" : "保存";
 
+  const isCodexDialog = editingConfig?.provider === "codex";
+
   return (
     <div className={AUTO_DIRECTOR_MOBILE_CLASSES.settingsPageRoot}>
       <div className="space-y-4">
@@ -456,7 +458,7 @@ export default function SettingsPage() {
         submitDisabled={providerSubmitDisabled}
         submitLabel={providerSubmitLabel}
         onTest={handleTestProviderDialog}
-        testDisabled={testMutation.isPending || !form.model.trim() || !form.baseURL.trim()}
+        testDisabled={testMutation.isPending || !form.model.trim() || (!isCodexDialog && !form.baseURL.trim())}
         testResult={dialogTestResult}
         onDeleteCustomProvider={handleDeleteCustomProvider}
         deleteDisabled={deleteCustomProviderMutation.isPending}

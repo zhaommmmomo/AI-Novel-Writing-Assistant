@@ -120,7 +120,7 @@
 
 ### 9. 模型路由与本地运行
 
-- 支持 OpenAI、DeepSeek、SiliconFlow、xAI 等多提供商；规划、正文、审阅、拆书等链路可按任务拆开路由
+- 支持 OpenAI、DeepSeek、SiliconFlow、xAI、Codex CLI 等多提供商；规划、正文、审阅、拆书等链路可按任务拆开路由
 - 默认 SQLite 即可跑通主链；需要 RAG 检索时再接入 Qdrant
 - RAG 并发数、限速等运行时参数从 .env 迁到设置面板，改完即生效无需重启
 - Monorepo 拆分（pnpm workspace），桌面版 / 介绍站 / 服务端 / 客户端独立可构建
@@ -147,11 +147,11 @@
 
 ## 最新更新
 
-### 2026-08-16
+### 2026-08-17
 
-- 自动导演发现局部章节计划失配时，会自动调整后续未生成章节的安排并继续创作，已保存正文和手动内容保持不变。
-- 从重规划检查点恢复时，会直接定位到首个未生成章节，避免再次处理已经完成的正文。
-- Windows 桌面版更新至 `0.4.13`，包含本次自动导演连续创作与重规划恢复改进。
+- 模型设置新增 Codex CLI，可直接复用本机 Codex 的 ChatGPT 登录，不需要填写模型 API Key。
+- Codex 可用于自动导演、正文生成、审阅和结构化规划；模型列表由本机 CLI 读取，并默认限制为单并发以提高长链路稳定性。
+- Codex 仅作为文本模型使用，不会被错误列入图片生成或知识库向量模型。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 
@@ -316,8 +316,8 @@
   推荐直接使用 `20.19.x LTS`
 - pnpm `>= 10.6`
   推荐直接使用仓库声明的 `pnpm@10.6.0`
-- 至少一组可用的 LLM API Key
-  也可以先把项目跑起来，再在页面里配置
+- 至少一种可用的文本模型连接
+  可以使用模型厂商 API Key，也可以直接复用已登录的 Codex CLI
 - 如果你要完整体验知识库 / RAG，再额外准备可用的 Qdrant
 
 ### 1. 安装依赖
@@ -448,7 +448,7 @@ Copy-Item client/.env.example client/.env
 当前项目已经支持在页面里配置模型相关设置：
 
 - `/settings`
-  配置供应商 API Key、默认模型、连通性测试
+  配置供应商 API Key 或 Codex CLI、默认模型、连通性测试
 - `/settings/model-routes`
   给不同任务分配不同 provider / model
 - `/knowledge?tab=settings`
@@ -479,7 +479,7 @@ pnpm dev
 
 建议第一次启动后先做这几步：
 
-1. 打开 `http://localhost:5173/settings`，至少配置一组可用的模型供应商 API Key
+1. 打开 `http://localhost:5173/settings`，至少配置一个可用的模型厂商或 Codex CLI
 2. 打开 `http://localhost:5173/settings/model-routes`，检查各任务实际使用的模型路由
 3. 如果要启用知识库，打开 `http://localhost:5173/knowledge?tab=settings`，保存 Embedding / Collection 设置
 

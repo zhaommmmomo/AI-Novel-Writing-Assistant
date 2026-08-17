@@ -4,7 +4,7 @@ import {
   getProviderEnvApiKey,
   getProviderEnvBaseUrl,
   getProviderEnvModel,
-  SUPPORTED_PROVIDERS,
+  SUPPORTED_EMBEDDING_PROVIDERS,
 } from "../../llm/providers";
 import { getRagRuntimeSettings } from "./RagRuntimeSettingsService";
 import { getRagEmbeddingSettings } from "./RagSettingsService";
@@ -219,7 +219,7 @@ async function importMissingRagSettingsFromEnv(): Promise<string[]> {
 }
 
 async function importMissingEmbeddingProviderRecords(): Promise<string[]> {
-  const providers: EmbeddingProvider[] = [...SUPPORTED_PROVIDERS];
+  const providers: EmbeddingProvider[] = [...SUPPORTED_EMBEDDING_PROVIDERS];
   try {
     const existingRecords = await prisma.aPIKey.findMany({
       where: {

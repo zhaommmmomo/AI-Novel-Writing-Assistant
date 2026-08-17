@@ -229,7 +229,7 @@ function buildBuiltInProviderStatus(
     isConfigured,
     isActive: item?.isActive ?? isConfigured,
     reasoningEnabled: item?.reasoningEnabled ?? true,
-    concurrencyLimit: normalizeProviderLimit(item?.concurrencyLimit),
+    concurrencyLimit: normalizeProviderLimit(item?.concurrencyLimit) || (provider === "codex" ? 1 : 0),
     requestIntervalMs: normalizeProviderLimit(item?.requestIntervalMs),
     supportsImageGeneration: Boolean(currentImageModel),
   };

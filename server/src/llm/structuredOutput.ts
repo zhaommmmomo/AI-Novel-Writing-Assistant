@@ -163,6 +163,14 @@ export function resolveStructuredOutputProfile(input: {
       safeStructuredMaxTokens: 8192,
     });
   }
+  if (input.provider === "codex") {
+    return buildProfile({
+      family: "codex_cli",
+      nativeJsonSchema: true,
+      nativeJsonObject: true,
+      preferredStructuredStrategy: "json_schema",
+    });
+  }
   if (input.provider === "gemini" || GEMINI_HOST_PATTERN.test(host)) {
     return buildProfile({
       family: "gemini",

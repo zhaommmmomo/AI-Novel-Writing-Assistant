@@ -349,7 +349,7 @@ export default function LLMSelector({
 
       {showHelperText && !hasRunnableProviders && !apiKeySettingsQuery.isLoading ? (
         <div className="text-xs text-muted-foreground">
-          当前没有已配置且启用的模型厂商，请先到系统设置里完成 API Key 和模型配置。
+          当前没有已配置且启用的模型厂商，请先到系统设置里完成模型连接配置。
         </div>
       ) : null}
 

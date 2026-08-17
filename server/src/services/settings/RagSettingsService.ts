@@ -5,7 +5,7 @@ import {
   isBuiltInProvider,
   providerRequiresApiKey,
   PROVIDERS,
-  SUPPORTED_PROVIDERS,
+  SUPPORTED_EMBEDDING_PROVIDERS,
 } from "../../llm/providers";
 import {
   getLegacyProviderEmbeddingModelEnv,
@@ -394,7 +394,7 @@ export async function saveRagEmbeddingSettings(input: RagEmbeddingSettingsInput)
 }
 
 export async function getRagEmbeddingProviders(): Promise<RagEmbeddingProviderStatus[]> {
-  const builtInProviders = [...SUPPORTED_PROVIDERS];
+  const builtInProviders = [...SUPPORTED_EMBEDDING_PROVIDERS];
   try {
     const items = await prisma.aPIKey.findMany({
       select: {

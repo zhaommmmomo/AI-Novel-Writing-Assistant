@@ -9,6 +9,7 @@ export const LLM_PROVIDERS = [
   "glm",
   "qwen",
   "gemini",
+  "codex",
   "ollama",
 ] as const;
 

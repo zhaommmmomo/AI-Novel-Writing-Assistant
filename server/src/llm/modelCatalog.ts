@@ -5,6 +5,7 @@ import {
   PROVIDERS,
   resolveProviderBaseUrl,
 } from "./providers";
+import { listCodexCliModels } from "../platform/llm/codex";
 
 interface ModelCacheItem {
   models: string[];
@@ -164,6 +165,13 @@ async function fetchProviderModels(
   apiKey?: string,
   customBaseURL?: string,
 ): Promise<string[]> {
+  if (provider === "codex") {
+    const models = await listCodexCliModels();
+    if (models.length === 0) {
+      throw new Error("Codex CLI 没有返回可用模型。");
+    }
+    return models;
+  }
   const baseURL = resolveProviderBaseUrl(provider, customBaseURL, customBaseURL);
   if (!baseURL) {
     throw new Error("未配置可用的 API URL。");

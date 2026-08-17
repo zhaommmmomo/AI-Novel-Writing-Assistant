@@ -26,6 +26,7 @@ import imagesRouter from "./routes/images";
 import knowledgeRouter from "./routes/knowledge";
 import llmRouter from "./routes/llm";
 import llmLiveRouter from "./platform/llm/live/http/llmLiveRoutes";
+import { closeCodexCliProxy } from "./platform/llm/codex";
 import novelRouter from "./modules/novel/http/novel";
 import creationStudioRouter from "./modules/novel/creation-studio/http/creationStudioRoutes";
 import { shortStoryProductionService } from "./modules/novel/short-story/application/ShortStoryProductionService";
@@ -341,6 +342,7 @@ export async function startServer(options?: ServerStartOptions): Promise<Started
     url: createServerUrl(host, port),
     close: async () => {
       await backgroundServices.stop();
+      await closeCodexCliProxy();
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
           if (error) {
