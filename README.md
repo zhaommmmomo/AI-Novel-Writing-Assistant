@@ -469,6 +469,19 @@ pnpm dev
 如果你已经复制好了 `server/.env` 和 `client/.env`，默认就是直接运行这一条。
 不需要在首次启动前手动再执行 `prisma generate`、`prisma db push` 或 `pnpm db:migrate`。
 
+macOS 需要后台运行时，可以使用仓库内的 LaunchAgent 管理脚本：
+
+```bash
+./scripts/novel-service.sh start
+./scripts/novel-service.sh restart
+./scripts/novel-service.sh stop
+./scripts/novel-service.sh status
+```
+
+脚本使用固定的 `com.ai-novel.dev` 服务标签，只管理自己的 LaunchAgent，当前
+运行日志写入 `.logs/novel-service.log`，不会通过端口或模糊进程名停止其他
+Node 服务。
+
 默认情况下：
 
 - 前端：`http://localhost:5173`
