@@ -153,6 +153,7 @@
 - Codex 长任务会通过 CLI 状态判断模型是否仍在处理，只有持续停滞、控制面异常或达到绝对上限时才中断。
 - 取消 Codex 请求时会确保对应后台 turn 一并停止，避免取消后仍长期占用模型调用槽位。
 - Codex 会在发送前检查结构化 schema 是否兼容，不兼容时自动改用提示词 JSON，避免意图理解和世界生成被 `invalid_json_schema` 中断。
+- Codex provider 默认继承本机用户级配置，并保留自定义 provider id 的大小写，避免公司 Proxy 被误切换成内置 ChatGPT provider。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 

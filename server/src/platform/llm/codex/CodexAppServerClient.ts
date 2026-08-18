@@ -95,12 +95,21 @@ function resolveCodexExecutable(): string {
   return configured;
 }
 
-function resolveModelProvider(): string {
-  const configured = process.env.CODEX_CLI_MODEL_PROVIDER?.trim() || "openai";
+export function resolveCodexModelProviderOverride(rawValue = process.env.CODEX_CLI_MODEL_PROVIDER): string | undefined {
+  const configured = rawValue?.trim();
+  if (!configured) {
+    return undefined;
+  }
   if (!MODEL_PROVIDER_PATTERN.test(configured)) {
     throw new Error("CODEX_CLI_MODEL_PROVIDER 格式不正确。");
   }
   return configured;
+}
+
+export function buildCodexAppServerArguments(modelProvider?: string): string[] {
+  return modelProvider
+    ? ["app-server", "-c", `model_provider=${JSON.stringify(modelProvider)}`]
+    : ["app-server"];
 }
 
 function resolveReasoningEffort(): string {
@@ -130,7 +139,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
   private readonly activeTurns = new Map<string, ActiveTurn>();
   private readonly diagnostics: string[] = [];
   private readonly workingDirectory = mkdtempSync(join(tmpdir(), "ai-novel-codex-"));
-  private readonly modelProvider = resolveModelProvider();
+  private readonly modelProvider = resolveCodexModelProviderOverride();
   private readonly reasoningEffort = resolveReasoningEffort();
   private readonly invocationSupervisor = new CodexInvocationSupervisor({
     onEvent: ({ event, threadId, elapsedMs, idleMs, detail }) => {
@@ -191,7 +200,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
     await this.ensureStarted();
     const threadResponse = await this.request("thread/start", {
       model: request.model,
-      modelProvider: this.modelProvider,
+      ...(this.modelProvider ? { modelProvider: this.modelProvider } : {}),
       allowProviderModelFallback: false,
       cwd: this.workingDirectory,
       runtimeWorkspaceRoots: [],
@@ -313,11 +322,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
   private async start(): Promise<void> {
     this.closing = false;
     const executable = resolveCodexExecutable();
-    const child = spawn(executable, [
-      "app-server",
-      "-c",
-      `model_provider=${JSON.stringify(this.modelProvider)}`,
-    ], {
+    const child = spawn(executable, buildCodexAppServerArguments(this.modelProvider), {
       cwd: this.workingDirectory,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],

@@ -31,7 +31,11 @@ export async function closeCodexCliProxy(): Promise<void> {
   await proxy?.close();
 }
 
-export { CodexAppServerClient } from "./CodexAppServerClient";
+export {
+  buildCodexAppServerArguments,
+  CodexAppServerClient,
+  resolveCodexModelProviderOverride,
+} from "./CodexAppServerClient";
 export { CodexCliOpenAIProxy } from "./CodexCliOpenAIProxy";
 export type {
   CodexAppServerLike,

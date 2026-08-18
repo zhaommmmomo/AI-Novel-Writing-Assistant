@@ -4,8 +4,10 @@ const { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require(
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 const {
+  buildCodexAppServerArguments,
   CodexAppServerClient,
   CodexCliOpenAIProxy,
+  resolveCodexModelProviderOverride,
 } = require("../dist/platform/llm/codex/index.js");
 
 async function waitFor(predicate, timeoutMs = 1500) {
@@ -53,6 +55,19 @@ function createFakeClient() {
     },
   };
 }
+
+test("Codex model provider override preserves case and otherwise inherits user config", () => {
+  assert.equal(resolveCodexModelProviderOverride(undefined), undefined);
+  assert.equal(resolveCodexModelProviderOverride("  "), undefined);
+  assert.equal(resolveCodexModelProviderOverride("OpenAI"), "OpenAI");
+  assert.equal(resolveCodexModelProviderOverride("openai"), "openai");
+  assert.deepEqual(buildCodexAppServerArguments(undefined), ["app-server"]);
+  assert.deepEqual(
+    buildCodexAppServerArguments("OpenAI"),
+    ["app-server", "-c", 'model_provider="OpenAI"'],
+  );
+  assert.throws(() => resolveCodexModelProviderOverride("unsafe provider"), /格式不正确/u);
+});
 
 test("Codex CLI proxy exposes authenticated model and completion endpoints", async () => {
   const client = createFakeClient();

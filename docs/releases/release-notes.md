@@ -11,6 +11,7 @@
 - 修复取消发生在 Codex turn id 返回之前时后台调用可能继续运行的问题，取消后的任务会在 turn id 到达后补发中断，避免长期占用模型调用槽位。
 - Codex 结构化调用会在发送前检查严格 JSON Schema 兼容性；开放对象、动态键或可选对象字段不再触发 `invalid_json_schema`，而是自动改用提示词 JSON 完成意图理解和本书世界生成。
 - Codex 线程进入 `systemError` 时会优先显示 app-server 返回的原始错误原因，避免只看到无法定位的通用传输错误。
+- Codex 工作台默认继承用户级 model provider，不再强制覆盖为小写 `openai`；自定义 Proxy provider 的大小写会被完整保留，避免错误切换到另一套 ChatGPT workspace 额度。
 
 ### 2026-08-17（Codex CLI 模型接入）
 
