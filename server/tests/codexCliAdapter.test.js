@@ -214,3 +214,61 @@ input.on("line", (line) => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("Codex app-server client preserves the detailed error after systemError status", { concurrency: false }, async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "novel-codex-system-error-"));
+  const executable = path.join(directory, "fake-codex");
+  writeFileSync(executable, `#!/usr/bin/env node
+const readline = require("node:readline");
+const input = readline.createInterface({ input: process.stdin });
+function send(payload) {
+  process.stdout.write(JSON.stringify(payload) + "\\n");
+}
+input.on("line", (line) => {
+  const message = JSON.parse(line);
+  if (message.method === "initialize") {
+    send({ id: message.id, result: {} });
+    return;
+  }
+  if (message.method === "thread/start") {
+    send({ id: message.id, result: { thread: { id: "thread-error" } } });
+    return;
+  }
+  if (message.method === "turn/start") {
+    send({ id: message.id, result: { turn: { id: "turn-error" } } });
+    setTimeout(() => send({
+      method: "thread/status/changed",
+      params: { threadId: "thread-error", status: { type: "systemError" } },
+    }), 10);
+    setTimeout(() => send({
+      method: "error",
+      params: {
+        threadId: "thread-error",
+        willRetry: false,
+        error: { message: "invalid_json_schema: propertyNames is not permitted" },
+      },
+    }), 20);
+  }
+});
+`, "utf8");
+  chmodSync(executable, 0o755);
+
+  const previousPath = process.env.CODEX_CLI_PATH;
+  process.env.CODEX_CLI_PATH = executable;
+  const client = new CodexAppServerClient();
+  try {
+    await assert.rejects(client.generate({
+      model: "gpt-test",
+      developerInstructions: "Return test content.",
+      input: "test",
+    }), /invalid_json_schema: propertyNames is not permitted/u);
+  } finally {
+    await client.close();
+    if (previousPath === undefined) {
+      delete process.env.CODEX_CLI_PATH;
+    } else {
+      process.env.CODEX_CLI_PATH = previousPath;
+    }
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

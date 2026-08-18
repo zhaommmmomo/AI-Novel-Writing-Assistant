@@ -9,9 +9,13 @@ const {
 } = require("../dist/llm/capabilities.js");
 const { resolveLLMClientOptions, setProviderSecretCache } = require("../dist/llm/factory.js");
 const { DEFAULT_LLM_REQUEST_TIMEOUT_MS } = require("../dist/config/llmInvocation.js");
+const { plannerIntentPrompt } = require("../dist/prompting/prompts/agent/plannerIntent.prompt.js");
+const { novelThemeWorldGenerationPrompt } = require("../dist/prompting/prompts/world/world.prompts.js");
 const {
   classifyStructuredOutputFailure,
+  findStrictJsonSchemaCompatibilityIssues,
   resolveStructuredOutputProfile,
+  resolveStructuredOutputStrategy,
   selectStructuredOutputStrategy,
 } = require("../dist/llm/structuredOutput.js");
 
@@ -66,6 +70,53 @@ test("codex CLI requires no API key and supports schema output through app-serve
   assert.equal(profile.family, "codex_cli");
   assert.equal(profile.nativeJsonSchema, true);
   assert.equal(profile.preferredStructuredStrategy, "json_schema");
+});
+
+test("codex structured output uses native schema only for the supported strict subset", () => {
+  const profile = resolveStructuredOutputProfile({
+    provider: "codex",
+    model: "gpt-5.6-sol",
+    executionMode: "structured",
+  });
+  const compatible = z.object({ value: z.string() });
+  const recordSchema = z.record(z.string(), z.unknown());
+  const passthroughSchema = z.object({ value: z.string() }).passthrough();
+  const optionalSchema = z.object({ value: z.string().optional() });
+
+  assert.equal(findStrictJsonSchemaCompatibilityIssues(compatible).length, 0);
+  assert.equal(selectStructuredOutputStrategy(profile, compatible), "json_schema");
+
+  assert.ok(findStrictJsonSchemaCompatibilityIssues(recordSchema).some((issue) => issue.keyword === "propertyNames"));
+  assert.equal(selectStructuredOutputStrategy(profile, recordSchema), "prompt_json");
+  assert.equal(selectStructuredOutputStrategy(profile, passthroughSchema), "prompt_json");
+  assert.equal(selectStructuredOutputStrategy(profile, optionalSchema), "prompt_json");
+  assert.equal(resolveStructuredOutputStrategy({
+    profile,
+    schema: recordSchema,
+    preferredStrategy: "json_schema",
+  }), "prompt_json");
+  assert.equal(resolveStructuredOutputStrategy({
+    profile,
+    schema: compatible,
+    preferredStrategy: "json_object",
+  }), "prompt_json");
+});
+
+test("Codex downgrades the exact planner intent and novel world schemas that previously returned HTTP 400", () => {
+  const profile = resolveStructuredOutputProfile({
+    provider: "codex",
+    model: "gpt-5.6-sol",
+    executionMode: "structured",
+  });
+
+  assert.equal(selectStructuredOutputStrategy(profile, plannerIntentPrompt.outputSchema), "prompt_json");
+  assert.equal(selectStructuredOutputStrategy(profile, novelThemeWorldGenerationPrompt.outputSchema), "prompt_json");
+  assert.ok(findStrictJsonSchemaCompatibilityIssues(plannerIntentPrompt.outputSchema).some(
+    (issue) => issue.keyword === "propertyNames",
+  ));
+  assert.ok(findStrictJsonSchemaCompatibilityIssues(novelThemeWorldGenerationPrompt.outputSchema).some(
+    (issue) => issue.keyword === "additionalProperties",
+  ));
 });
 
 test("LLM clients use a long shared timeout while preserving explicit overrides", { concurrency: false }, async () => {

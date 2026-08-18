@@ -34,6 +34,12 @@ export interface StructuredOutputDiagnostics {
   errorCategory: StructuredOutputErrorCategory | null;
 }
 
+export interface StrictJsonSchemaCompatibilityIssue {
+  path: string;
+  keyword: string;
+  message: string;
+}
+
 const QWEN_FAMILY_PATTERN = /(?:^|[/:_-])qwen(?:\d+(?:\.\d+)?)?/i;
 const DASHSCOPE_HOST_PATTERN = /(?:^|\.)dashscope\.aliyuncs\.com$/i;
 const MODELSCOPE_HOST_PATTERN = /(?:^|\.)modelscope\.cn$/i;
@@ -300,6 +306,128 @@ export function schemaAllowsTopLevelArray<T>(schema: ZodType<T>): boolean {
   return probe.error.issues.some((issue) => issue.path.length === 0 && issue.code !== "invalid_type");
 }
 
+const UNSUPPORTED_STRICT_SCHEMA_KEYWORDS = new Set([
+  "propertyNames",
+  "patternProperties",
+  "unevaluatedProperties",
+  "dependentRequired",
+  "dependentSchemas",
+  "minProperties",
+  "maxProperties",
+]);
+
+function collectStrictJsonSchemaCompatibilityIssues(
+  value: unknown,
+  path: string,
+  issues: StrictJsonSchemaCompatibilityIssue[],
+): void {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectStrictJsonSchemaCompatibilityIssues(item, `${path}[${index}]`, issues));
+    return;
+  }
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  for (const keyword of UNSUPPORTED_STRICT_SCHEMA_KEYWORDS) {
+    if (Object.prototype.hasOwnProperty.call(record, keyword)) {
+      issues.push({
+        path,
+        keyword,
+        message: `${keyword} is not supported by strict structured output.`,
+      });
+    }
+  }
+
+  const properties = record.properties;
+  const isObjectSchema = record.type === "object"
+    || Boolean(properties && typeof properties === "object" && !Array.isArray(properties));
+  if (isObjectSchema) {
+    if (record.additionalProperties !== false) {
+      issues.push({
+        path,
+        keyword: "additionalProperties",
+        message: "Object schemas must set additionalProperties to false.",
+      });
+    }
+    if (properties && typeof properties === "object" && !Array.isArray(properties)) {
+      const required = new Set(Array.isArray(record.required)
+        ? record.required.filter((item): item is string => typeof item === "string")
+        : []);
+      for (const key of Object.keys(properties)) {
+        if (!required.has(key)) {
+          issues.push({
+            path: `${path}.properties.${key}`,
+            keyword: "required",
+            message: "Every object property must be listed in required.",
+          });
+        }
+      }
+    }
+  }
+
+  for (const [key, child] of Object.entries(record)) {
+    collectStrictJsonSchemaCompatibilityIssues(child, `${path}.${key}`, issues);
+  }
+}
+
+export function findStrictJsonSchemaCompatibilityIssues<T>(
+  schema: ZodType<T>,
+): StrictJsonSchemaCompatibilityIssue[] {
+  const issues: StrictJsonSchemaCompatibilityIssue[] = [];
+  collectStrictJsonSchemaCompatibilityIssues(toJSONSchema(schema), "$", issues);
+  return issues;
+}
+
+export function isStructuredOutputStrategyCompatible<T>(input: {
+  profile: StructuredOutputProfile;
+  schema: ZodType<T>;
+  strategy: StructuredOutputStrategy;
+}): boolean {
+  if (input.strategy === "prompt_json") {
+    return true;
+  }
+  if (input.profile.family !== "codex_cli") {
+    return true;
+  }
+  if (input.strategy === "json_object") {
+    return false;
+  }
+  return findStrictJsonSchemaCompatibilityIssues(input.schema).length === 0;
+}
+
+export function resolveStructuredOutputStrategy<T>(input: {
+  profile: StructuredOutputProfile;
+  schema: ZodType<T>;
+  preferredStrategy?: StructuredOutputStrategy | null;
+}): StructuredOutputStrategy {
+  const preferred = input.preferredStrategy ?? input.profile.preferredStructuredStrategy;
+  if (
+    preferred === "json_schema"
+    && input.profile.nativeJsonSchema
+    && isStructuredOutputStrategyCompatible({
+      profile: input.profile,
+      schema: input.schema,
+      strategy: preferred,
+    })
+  ) {
+    return preferred;
+  }
+  if (
+    (preferred === "json_object" || preferred === "json_schema")
+    && input.profile.nativeJsonObject
+    && isStructuredOutputStrategyCompatible({
+      profile: input.profile,
+      schema: input.schema,
+      strategy: "json_object",
+    })
+  ) {
+    return "json_object";
+  }
+  return "prompt_json";
+}
+
 export function selectStructuredOutputStrategy<T>(
   profile: StructuredOutputProfile,
   schema: ZodType<T>,
@@ -307,16 +435,7 @@ export function selectStructuredOutputStrategy<T>(
   if (schemaAllowsTopLevelArray(schema)) {
     return "prompt_json";
   }
-  if (profile.preferredStructuredStrategy === "json_schema" && profile.nativeJsonSchema) {
-    return "json_schema";
-  }
-  if (
-    (profile.preferredStructuredStrategy === "json_object" || profile.preferredStructuredStrategy === "json_schema")
-    && profile.nativeJsonObject
-  ) {
-    return "json_object";
-  }
-  return "prompt_json";
+  return resolveStructuredOutputStrategy({ profile, schema });
 }
 
 function sanitizeSchemaName(label: string): string {

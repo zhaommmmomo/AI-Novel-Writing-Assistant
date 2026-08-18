@@ -389,6 +389,80 @@ test("invokeStructuredLlmDetailed degrades to prompt JSON before using fallback 
   }
 });
 
+test("invokeStructuredLlmDetailed ignores incompatible explicit Codex json_schema routes", async () => {
+  const originalResolveOptions = factory.resolveLLMClientOptions;
+  const originalCreateLLM = factory.createLLMFromResolvedOptions;
+  const originalGetFallbackSettings = structuredFallbackSettings.getStructuredFallbackSettings;
+  const calls = [];
+
+  factory.resolveLLMClientOptions = async (_provider, options = {}) => {
+    const profile = options.executionMode === "structured"
+      ? resolveStructuredOutputProfile({
+        provider: "codex",
+        model: "gpt-5.6-sol",
+        executionMode: "structured",
+      })
+      : null;
+    return {
+      provider: "codex",
+      providerName: "Codex CLI",
+      model: "gpt-5.6-sol",
+      temperature: options.temperature ?? 0.3,
+      apiKey: "test-key",
+      baseURL: "http://127.0.0.1:1/v1",
+      maxTokens: options.maxTokens,
+      timeoutMs: 60_000,
+      concurrencyLimit: 1,
+      requestIntervalMs: 0,
+      reasoningEnabled: true,
+      modelKwargs: undefined,
+      includeRawResponse: false,
+      requestProtocol: "openai_compatible",
+      executionMode: options.executionMode ?? "plain",
+      structuredProfile: profile,
+      structuredStrategy: options.structuredStrategy ?? null,
+      reasoningForcedOff: false,
+      taskType: options.taskType,
+      promptMeta: options.promptMeta,
+    };
+  };
+  factory.createLLMFromResolvedOptions = (resolved) => ({
+    stream: async function* () {
+      calls.push(resolved.structuredStrategy);
+      yield { content: "{\"value\":\"ok\"}" };
+    },
+  });
+  structuredFallbackSettings.getStructuredFallbackSettings = async () => ({
+    enabled: false,
+    provider: "deepseek",
+    model: "deepseek-chat",
+    temperature: 0.2,
+    maxTokens: null,
+  });
+
+  try {
+    const result = await structuredInvoke.invokeStructuredLlmDetailed({
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      structuredStrategy: "json_schema",
+      label: "structured.invoke.codex.incompatible-schema",
+      taskType: "planner",
+      schema: z.record(z.string(), z.unknown()),
+      systemPrompt: "只返回 JSON。",
+      userPrompt: "给我一个 value。",
+      disableFallbackModel: true,
+    });
+
+    assert.deepEqual(result.data, { value: "ok" });
+    assert.deepEqual(calls, ["prompt_json"]);
+    assert.equal(result.diagnostics.strategy, "prompt_json");
+  } finally {
+    factory.resolveLLMClientOptions = originalResolveOptions;
+    factory.createLLMFromResolvedOptions = originalCreateLLM;
+    structuredFallbackSettings.getStructuredFallbackSettings = originalGetFallbackSettings;
+  }
+});
+
 test("invokeStructuredLlmDetailed switches to the configured fallback model after primary transport failure", async () => {
   const originalResolveOptions = factory.resolveLLMClientOptions;
   const originalCreateLLM = factory.createLLMFromResolvedOptions;

@@ -35,6 +35,7 @@ interface ActiveTurn {
   reject: (error: Error) => void;
   abortCleanup?: () => void;
   watchdog?: CodexInvocationHandle;
+  systemErrorTimer?: NodeJS.Timeout;
   abortRequested: boolean;
   settled: boolean;
 }
@@ -49,6 +50,7 @@ interface ProtocolResponse {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const INITIALIZE_TIMEOUT_MS = 20_000;
+const SYSTEM_ERROR_DETAIL_GRACE_MS = 1_000;
 const MODEL_PROVIDER_PATTERN = /^[a-zA-Z0-9._-]+$/u;
 const REASONING_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max", "ultra"]);
 const BASE_INSTRUCTIONS = [
@@ -444,7 +446,18 @@ export class CodexAppServerClient implements CodexAppServerLike {
     }
     if (method === "thread/status/changed") {
       try {
-        active.watchdog?.observeStatus(normalizeCodexThreadRuntimeStatus(candidate.status));
+        const status = normalizeCodexThreadRuntimeStatus(candidate.status);
+        active.watchdog?.observeStatus(status);
+        if (status.type === "active" && active.systemErrorTimer) {
+          clearTimeout(active.systemErrorTimer);
+          active.systemErrorTimer = undefined;
+        } else if (status.type === "systemError" && !active.systemErrorTimer) {
+          active.systemErrorTimer = setTimeout(() => {
+            active.systemErrorTimer = undefined;
+            this.settleTurn(active, new Error("Codex app-server 报告线程进入 systemError 状态。"));
+          }, SYSTEM_ERROR_DETAIL_GRACE_MS);
+          active.systemErrorTimer.unref?.();
+        }
       } catch (error) {
         this.settleTurn(active, error instanceof Error ? error : new Error(toErrorMessage(error)));
       }
@@ -486,6 +499,10 @@ export class CodexAppServerClient implements CodexAppServerLike {
     }
     active.settled = true;
     active.abortCleanup?.();
+    if (active.systemErrorTimer) {
+      clearTimeout(active.systemErrorTimer);
+      active.systemErrorTimer = undefined;
+    }
     active.watchdog?.stop();
     this.activeTurns.delete(active.threadId);
     if (error) {

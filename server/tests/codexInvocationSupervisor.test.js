@@ -127,6 +127,16 @@ test("Codex invocation supervisor rejects interactive blocked states", async () 
   assert.equal(harness.interrupts, 1);
 });
 
+test("Codex invocation supervisor leaves systemError detail handling to the app-server client", async () => {
+  const harness = createHarness();
+  harness.handle.observeStatus({ type: "systemError" });
+  await Promise.resolve();
+
+  assert.equal(harness.failures.length, 0);
+  assert.equal(harness.interrupts, 0);
+  harness.handle.stop();
+});
+
 test("Codex thread status normalization accepts protocol states and rejects unknown values", () => {
   assert.deepEqual(
     normalizeCodexThreadRuntimeStatus({ type: "active", activeFlags: ["waitingOnApproval", 3] }),

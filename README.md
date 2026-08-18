@@ -152,6 +152,7 @@
 - 文本模型默认可等待 20 分钟，世界生成和复杂结构化规划不会再因为固定 2 分钟限制过早失败。
 - Codex 长任务会通过 CLI 状态判断模型是否仍在处理，只有持续停滞、控制面异常或达到绝对上限时才中断。
 - 取消 Codex 请求时会确保对应后台 turn 一并停止，避免取消后仍长期占用模型调用槽位。
+- Codex 会在发送前检查结构化 schema 是否兼容，不兼容时自动改用提示词 JSON，避免意图理解和世界生成被 `invalid_json_schema` 中断。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 

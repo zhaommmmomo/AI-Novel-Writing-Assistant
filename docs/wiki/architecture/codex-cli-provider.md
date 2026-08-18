@@ -21,6 +21,7 @@ Codex 作为内置文本厂商接入，但不直接改写每条业务调用链�
 - 本地 OpenAI 兼容端点只绑定回环地址，并使用每次服务启动随机生成的内存令牌。令牌不写入数据库、日志、env 或前端。
 - Codex thread 使用只读 sandbox、`approvalPolicy=never`、空 workspace roots、空 environments、空 dynamic tools，并通过基础指令禁止工具、命令、文件和网络访问。
 - 普通响应通过 `item/agentMessage/delta` 转换为 OpenAI SSE；结构化请求把 `response_format.json_schema.schema` 映射到 `turn/start.outputSchema`。
+- Codex 原生 `json_schema` 只用于通过严格兼容检查的 schema：对象必须关闭额外字段、所有属性必须进入 `required`，并且不能包含 `propertyNames` 等不支持关键字。`z.record(...)`、`.passthrough()`、可选对象字段等生成不兼容结构时，必须在本地直接降级到 `prompt_json`，不能先向 Codex 发送一个必然返回 HTTP 400 的请求。
 - 每个应用请求使用独立 ephemeral thread。服务端停止时必须同时关闭回环 HTTP 服务和 app-server 子进程。
 - Codex 默认并发为 1；用户可以在厂商高级设置中提高并发，但应自行承担订阅限额和并行稳定性风险。
 - 模型目录来自 `model/list` 动态读取；代码中的模型清单只是首次显示和离线兜底，不是长期事实源。
@@ -56,6 +57,8 @@ Codex 调用不能只依赖业务任务的 `heartbeatAt` 判断健康。业务�
 - **推理强度不生效**：检查 `CODEX_CLI_REASONING_EFFORT`；支持值为 `low`、`medium`、`high`、`xhigh`、`max`、`ultra`，小说默认使用 `max`。
 - **公司 Proxy 在 CLI 可用、工作台不可用**：确认启动服务的 shell 或桌面进程能获得 Proxy 所需环境变量；项目不会从其他文件复制密钥。
 - **JSON 结果不稳定**：确认模型路由使用 `json_schema`，并检查 app-server 版本是否支持 `turn/start.outputSchema`。
+- **Codex 报 `invalid_json_schema`**：先检查应用实际生成的 schema；包含 `propertyNames`、开放式 `additionalProperties` 或未列入 `required` 的对象属性时应本地降级。模型路由显式选择 `json_schema` 也不能绕过兼容检查。
+- **只看到 `systemError` 看不到原因**：app-server 通常会紧接着发送详细 `error` 通知。适配器应短暂等待并优先返回原始错误，例如 `invalid_json_schema`，只有详细通知缺失时才使用通用 `systemError` 文案。
 - **长链路速度较慢**：先确认 Codex 厂商并发限制。提高并发前应观察订阅限流和 app-server 稳定性。
 - **日志出现固定短超时**：确认业务模块没有覆盖平台默认超时，并检查 `LLM_REQUEST_TIMEOUT_MS` 是否仍保留旧值。
 - **线程长期 active 但没有输出**：查看 `codex.watchdog` 日志中的最近活动、探活结果和静默时长；达到停滞阈值后应收到 `turn/interrupt`，而不是无限等待。

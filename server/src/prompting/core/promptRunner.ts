@@ -9,6 +9,7 @@ import {
 import {
   buildStructuredResponseFormat,
   resolveStructuredOutputProfile,
+  resolveStructuredOutputStrategy,
   selectStructuredOutputStrategy,
 } from "../../llm/structuredOutput";
 import {
@@ -1103,7 +1104,11 @@ export async function streamStructuredPrompt<I, O, R = O>(input: {
       requestProtocol: resolvedLLM?.requestProtocol,
       executionMode: "structured",
     });
-    strategy = resolvedLLM?.structuredStrategy ?? selectStructuredOutputStrategy(profile, outputSchema);
+    strategy = resolveStructuredOutputStrategy({
+      profile,
+      schema: outputSchema,
+      preferredStrategy: resolvedLLM?.structuredStrategy,
+    });
     const invokeOptions: Record<string, unknown> = {};
     const responseFormat = buildStructuredResponseFormat({
       strategy,

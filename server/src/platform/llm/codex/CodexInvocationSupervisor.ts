@@ -153,14 +153,9 @@ export class CodexInvocationSupervisor {
           record.activeProbeReported = false;
           return;
         }
-        if (status.type === "systemError") {
-          this.terminate(
-            record,
-            createSupervisorError("CodexThreadError", "Codex app-server 报告线程进入 systemError 状态。"),
-            "thread_unavailable",
-            status.type,
-          );
-        }
+        // The app-server emits a detailed `error` notification around a
+        // systemError transition. The client gives that original error a
+        // short window to arrive before falling back to a generic message.
       },
       stop: () => this.remove(record),
     };

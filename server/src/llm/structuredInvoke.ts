@@ -15,6 +15,7 @@ import {
   classifyStructuredOutputFailure,
   extractStructuredOutputErrorCategory,
   resolveStructuredOutputProfile,
+  resolveStructuredOutputStrategy,
   schemaAllowsTopLevelArray,
   selectStructuredOutputStrategy,
   StructuredOutputError,
@@ -93,7 +94,10 @@ function buildStrategySequence<T>(
 ): StructuredOutputStrategy[] {
   const first = selectStructuredOutputStrategy(profile, schema);
   const sequence: StructuredOutputStrategy[] = [first];
-  if (first === "json_schema" && profile.nativeJsonObject) {
+  if (
+    first === "json_schema"
+    && resolveStructuredOutputStrategy({ profile, schema, preferredStrategy: "json_object" }) === "json_object"
+  ) {
     sequence.push("json_object");
   }
   if (first !== "prompt_json") {
@@ -324,10 +328,17 @@ async function tryStructuredStrategies<T>(input: {
   fallbackUsed: boolean;
 }): Promise<StructuredInvokeResult<T>> {
   const sequence = buildStrategySequence(input.target.profile, input.baseInput.schema);
-  const preferredSequence = input.target.preferredStrategy
+  const compatiblePreferredStrategy = input.target.preferredStrategy
+    ? resolveStructuredOutputStrategy({
+      profile: input.target.profile,
+      schema: input.baseInput.schema,
+      preferredStrategy: input.target.preferredStrategy,
+    })
+    : null;
+  const preferredSequence = compatiblePreferredStrategy
     ? [
-      input.target.preferredStrategy,
-      ...sequence.filter((strategy) => strategy !== input.target.preferredStrategy),
+      compatiblePreferredStrategy,
+      ...sequence.filter((strategy) => strategy !== compatiblePreferredStrategy),
     ]
     : sequence;
   let lastError: StructuredOutputError | null = null;
