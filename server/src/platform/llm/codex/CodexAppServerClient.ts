@@ -11,6 +11,12 @@ import type {
   CodexTokenUsageBreakdown,
 } from "./protocol";
 import { extractCompletedAgentText, normalizeTokenUsage } from "./protocol";
+import {
+  CodexInvocationSupervisor,
+  normalizeCodexThreadRuntimeStatus,
+  type CodexInvocationHandle,
+  type CodexThreadRuntimeStatus,
+} from "./CodexInvocationSupervisor";
 
 interface PendingRequest {
   method: string;
@@ -28,6 +34,8 @@ interface ActiveTurn {
   resolve: (value: CodexGenerationResult) => void;
   reject: (error: Error) => void;
   abortCleanup?: () => void;
+  watchdog?: CodexInvocationHandle;
+  abortRequested: boolean;
   settled: boolean;
 }
 
@@ -122,6 +130,25 @@ export class CodexAppServerClient implements CodexAppServerLike {
   private readonly workingDirectory = mkdtempSync(join(tmpdir(), "ai-novel-codex-"));
   private readonly modelProvider = resolveModelProvider();
   private readonly reasoningEffort = resolveReasoningEffort();
+  private readonly invocationSupervisor = new CodexInvocationSupervisor({
+    onEvent: ({ event, threadId, elapsedMs, idleMs, detail }) => {
+      if (event === "probe_started") {
+        return;
+      }
+      const message = [
+        `[codex.watchdog] event=${event}`,
+        `threadId=${threadId}`,
+        `elapsedMs=${elapsedMs}`,
+        `idleMs=${idleMs}`,
+        ...(detail ? [`detail=${JSON.stringify(detail)}`] : []),
+      ].join(" ");
+      if (event === "probe_active") {
+        console.info(message);
+        return;
+      }
+      console.warn(message);
+    },
+  });
   private closing = false;
 
   async listModels(): Promise<CodexModelDescriptor[]> {
@@ -190,19 +217,22 @@ export class CodexAppServerClient implements CodexAppServerLike {
         onDelta: request.onDelta,
         resolve,
         reject,
+        abortRequested: false,
         settled: false,
       };
       this.activeTurns.set(threadId, active);
+      active.watchdog = this.invocationSupervisor.register({
+        threadId,
+        probe: () => this.readThreadStatus(threadId),
+        interrupt: () => this.interruptTurn(active),
+        onFailure: (error) => this.settleTurn(active, error),
+      });
 
       if (request.signal) {
         const abortHandler = () => {
           const error = createAbortError();
-          if (active.turnId) {
-            void this.request("turn/interrupt", {
-              threadId,
-              turnId: active.turnId,
-            }).catch(() => undefined);
-          }
+          active.abortRequested = true;
+          void this.interruptTurn(active).catch(() => undefined);
           this.settleTurn(active, error);
         };
         request.signal.addEventListener("abort", abortHandler, { once: true });
@@ -224,7 +254,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
       }).then((value) => {
         const turnId = (value as { turn?: { id?: unknown } })?.turn?.id;
         if (typeof turnId === "string") {
-          active.turnId = turnId;
+          this.assignTurnId(active, turnId);
         }
       }).catch((error) => {
         this.settleTurn(active, error instanceof Error ? error : new Error(toErrorMessage(error)));
@@ -242,6 +272,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
       pending.reject(error);
     }
     this.pendingRequests.clear();
+    this.invocationSupervisor.close();
     for (const active of this.activeTurns.values()) {
       this.settleTurn(active, error);
     }
@@ -392,6 +423,7 @@ export class CodexAppServerClient implements CodexAppServerLike {
         items?: unknown;
       };
       error?: { message?: unknown };
+      status?: unknown;
       willRetry?: unknown;
     };
     const threadId = typeof candidate.threadId === "string" ? candidate.threadId : undefined;
@@ -402,6 +434,23 @@ export class CodexAppServerClient implements CodexAppServerLike {
     if (!active || active.settled) {
       return;
     }
+    if (method === "turn/started") {
+      const turnId = candidate.turn?.id;
+      if (typeof turnId === "string") {
+        this.assignTurnId(active, turnId);
+      }
+      active.watchdog?.activity(method);
+      return;
+    }
+    if (method === "thread/status/changed") {
+      try {
+        active.watchdog?.observeStatus(normalizeCodexThreadRuntimeStatus(candidate.status));
+      } catch (error) {
+        this.settleTurn(active, error instanceof Error ? error : new Error(toErrorMessage(error)));
+      }
+      return;
+    }
+    active.watchdog?.activity(method);
     if (method === "item/agentMessage/delta" && typeof candidate.delta === "string") {
       active.content += candidate.delta;
       active.onDelta?.(candidate.delta);
@@ -437,12 +486,39 @@ export class CodexAppServerClient implements CodexAppServerLike {
     }
     active.settled = true;
     active.abortCleanup?.();
+    active.watchdog?.stop();
     this.activeTurns.delete(active.threadId);
     if (error) {
       active.reject(error);
       return;
     }
     active.resolve(result ?? { content: active.content, usage: active.usage });
+  }
+
+  private assignTurnId(active: ActiveTurn, turnId: string): void {
+    active.turnId = turnId;
+    active.watchdog?.activity("turn_id_assigned");
+    if (active.abortRequested || active.settled) {
+      void this.interruptTurn(active).catch(() => undefined);
+    }
+  }
+
+  private async interruptTurn(active: ActiveTurn): Promise<void> {
+    if (!active.turnId) {
+      return;
+    }
+    await this.request("turn/interrupt", {
+      threadId: active.threadId,
+      turnId: active.turnId,
+    });
+  }
+
+  private async readThreadStatus(threadId: string): Promise<CodexThreadRuntimeStatus> {
+    const response = await this.request("thread/read", {
+      threadId,
+      includeTurns: false,
+    }) as { thread?: { status?: unknown } };
+    return normalizeCodexThreadRuntimeStatus(response?.thread?.status);
   }
 
   private captureDiagnostic(chunk: string): void {

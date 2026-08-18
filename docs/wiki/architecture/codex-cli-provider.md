@@ -25,6 +25,23 @@ Codex 作为内置文本厂商接入，但不直接改写每条业务调用链�
 - Codex 默认并发为 1；用户可以在厂商高级设置中提高并发，但应自行承担订阅限额和并行稳定性风险。
 - 模型目录来自 `model/list` 动态读取；代码中的模型清单只是首次显示和离线兜底，不是长期事实源。
 
+## 调用监督与超时
+
+文本模型调用统一使用平台级超时策略。未显式指定超时的请求默认允许运行 20 分钟，业务模块不应再为普通世界生成、规划或正文请求写入更短的局部硬超时。确有独立服务等级要求的任务可以显式覆盖，但必须说明原因并保留可取消信号。
+
+Codex 调用不能只依赖业务任务的 `heartbeatAt` 判断健康。业务心跳只能证明 Node 任务仍在运行，不能证明 app-server 中的模型 turn 仍有进展。Codex 适配器必须使用 app-server 控制面监督每个在途 turn：
+
+- `turn/started`、item 事件、文本增量、token usage 和线程状态变化都算作协议活动。
+- 连续 3 分钟没有协议活动时，通过 `thread/read` 查询线程状态；`active` 表示可以继续等待，不额外发送模型提示。
+- 连续 10 分钟没有任何协议活动时，即使线程仍报告 `active`，也视为疑似停滞并调用 `turn/interrupt`。
+- `thread/read` 连续失败两次，或线程进入 `systemError`，应中断 turn 并交给现有错误、备用模型或任务恢复链处理。
+- `activeFlags` 出现 `waitingOnApproval` 或 `waitingOnUserInput` 时不算正常处理；当前适配器禁止工具审批与用户追问，应立即按阻塞状态中断。
+- 任何单次 Codex turn 的默认绝对上限为 20 分钟，防止控制面异常时永久占用调用槽位。
+
+取消请求时必须处理 `turn/start` 回包竞态：如果取消发生时尚未获得 `turnId`，在后续收到 `turnId` 后仍要补发 `turn/interrupt`。不能只结束 HTTP 请求而让 app-server 中的孤儿 turn 继续运行。
+
+相关阈值通过 `LLM_REQUEST_TIMEOUT_MS`、`CODEX_CLI_IDLE_PROBE_MS`、`CODEX_CLI_STALL_TIMEOUT_MS`、`CODEX_CLI_WATCHDOG_HARD_TIMEOUT_MS`、`CODEX_CLI_WATCHDOG_INTERVAL_MS` 和 `CODEX_CLI_MAX_PROBE_FAILURES` 配置。阈值调整应优先修改平台配置，不要在业务服务中复制常量。
+
 ## 安全边界
 
 - 不读取、复制、输出或持久化 Codex 的认证文件、ChatGPT 登录令牌或 `AM_API_KEY`。
@@ -40,6 +57,9 @@ Codex 作为内置文本厂商接入，但不直接改写每条业务调用链�
 - **公司 Proxy 在 CLI 可用、工作台不可用**：确认启动服务的 shell 或桌面进程能获得 Proxy 所需环境变量；项目不会从其他文件复制密钥。
 - **JSON 结果不稳定**：确认模型路由使用 `json_schema`，并检查 app-server 版本是否支持 `turn/start.outputSchema`。
 - **长链路速度较慢**：先确认 Codex 厂商并发限制。提高并发前应观察订阅限流和 app-server 稳定性。
+- **日志出现固定短超时**：确认业务模块没有覆盖平台默认超时，并检查 `LLM_REQUEST_TIMEOUT_MS` 是否仍保留旧值。
+- **线程长期 active 但没有输出**：查看 `codex.watchdog` 日志中的最近活动、探活结果和静默时长；达到停滞阈值后应收到 `turn/interrupt`，而不是无限等待。
+- **取消后仍有 Codex 占用**：检查 `turn/start` 延迟回包后是否补发中断；这是取消与 `turnId` 建立之间的竞态，不应通过重复重启任务掩盖。
 
 ## 相关模块
 

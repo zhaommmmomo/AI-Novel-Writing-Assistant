@@ -2,7 +2,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { toJSONSchema, type ZodError, type ZodType } from "zod";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
-import { getLLM } from "./factory";
+import { getLLM, getResolvedLLMClientOptionsFromInstance } from "./factory";
 import { runWithEnforcedTimeout } from "./invokeTimeout";
 import { logStructuredRepairSession } from "./repairLogging";
 import type { TaskType } from "./modelRouter";
@@ -182,6 +182,7 @@ export async function repairWithLlm<T>(
     executionMode: "structured",
     structuredStrategy: "prompt_json",
   });
+  const resolvedTimeoutMs = getResolvedLLMClientOptionsFromInstance(llm)?.timeoutMs ?? input.timeoutMs;
 
   const repairSystem = [
     "你是 JSON 修复器。",
@@ -252,7 +253,7 @@ export async function repairWithLlm<T>(
     }
     const repairedRaw = await runWithEnforcedTimeout({
       label: `${input.label}#repair-${repairAttempt}`,
-      timeoutMs: input.timeoutMs,
+      timeoutMs: resolvedTimeoutMs,
       signal: input.signal,
       run: async (signal) => {
         const stream = await llm.stream(

@@ -8,6 +8,7 @@ const {
   resolveModelTemperature,
 } = require("../dist/llm/capabilities.js");
 const { resolveLLMClientOptions, setProviderSecretCache } = require("../dist/llm/factory.js");
+const { DEFAULT_LLM_REQUEST_TIMEOUT_MS } = require("../dist/config/llmInvocation.js");
 const {
   classifyStructuredOutputFailure,
   resolveStructuredOutputProfile,
@@ -65,6 +66,30 @@ test("codex CLI requires no API key and supports schema output through app-serve
   assert.equal(profile.family, "codex_cli");
   assert.equal(profile.nativeJsonSchema, true);
   assert.equal(profile.preferredStructuredStrategy, "json_schema");
+});
+
+test("LLM clients use a long shared timeout while preserving explicit overrides", { concurrency: false }, async () => {
+  const previous = process.env.LLM_REQUEST_TIMEOUT_MS;
+  delete process.env.LLM_REQUEST_TIMEOUT_MS;
+  setProviderSecretCache("openai", {
+    key: "test-key",
+    model: "gpt-5-mini",
+    baseURL: "https://api.openai.com/v1",
+  });
+  try {
+    const defaultResolved = await resolveLLMClientOptions("openai");
+    assert.equal(defaultResolved.timeoutMs, DEFAULT_LLM_REQUEST_TIMEOUT_MS);
+
+    const explicitResolved = await resolveLLMClientOptions("openai", { timeoutMs: 75_000 });
+    assert.equal(explicitResolved.timeoutMs, 75_000);
+  } finally {
+    setProviderSecretCache("openai", null);
+    if (previous === undefined) {
+      delete process.env.LLM_REQUEST_TIMEOUT_MS;
+    } else {
+      process.env.LLM_REQUEST_TIMEOUT_MS = previous;
+    }
+  }
 });
 
 test("minimax clamps temperature into supported range", () => {

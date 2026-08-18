@@ -15,7 +15,6 @@ import {
   WORLD_STRUCTURE_SCHEMA_VERSION,
 } from "./worldStructure";
 
-const WORLD_SKELETON_GENERATION_TIMEOUT_MS = 120_000;
 const WORLD_SKELETON_GENERATION_MAX_TOKENS = 6_000;
 
 export interface WorldSkeletonGenerateInput {
@@ -48,7 +47,6 @@ export async function generateWorldSkeleton(
       model: input.model,
       temperature: 0.7,
       maxTokens: WORLD_SKELETON_GENERATION_MAX_TOKENS,
-      timeoutMs: WORLD_SKELETON_GENERATION_TIMEOUT_MS,
     },
   });
 

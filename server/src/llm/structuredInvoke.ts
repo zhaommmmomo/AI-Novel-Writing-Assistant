@@ -223,7 +223,7 @@ async function invokeStructuredAttempt<T>(input: {
     liveSession.phase("streaming", "模型正在返回结构化结果");
     const collected = await runWithEnforcedTimeout({
       label: input.baseInput.label,
-      timeoutMs: input.baseInput.timeoutMs,
+      timeoutMs: resolved.timeoutMs,
       signal: input.baseInput.signal,
       run: async (signal) => {
         const stream = await llm.stream(
@@ -266,7 +266,7 @@ async function invokeStructuredAttempt<T>(input: {
       baseURL: resolved.baseURL,
       temperature: resolved.temperature,
       maxTokens: resolved.maxTokens,
-      timeoutMs: input.baseInput.timeoutMs,
+      timeoutMs: resolved.timeoutMs,
       signal: input.baseInput.signal,
       taskType: input.baseInput.taskType,
       requestProtocol: resolved.requestProtocol,

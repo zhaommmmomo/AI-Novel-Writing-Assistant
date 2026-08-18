@@ -44,7 +44,7 @@ test("generating a novel world keeps the selected model instead of forcing DeepS
     assert.equal(captured[0].model, "qwen3:8b");
     assert.equal(captured[0].temperature, 0.35);
     assert.equal(captured[0].maxTokens, 4_800);
-    assert.equal(captured[0].timeoutMs, 120_000);
+    assert.equal(captured[0].timeoutMs, undefined);
     assert.equal(captured[0].maxRepairAttempts, 0);
   } finally {
     prisma.novel = originalNovel;

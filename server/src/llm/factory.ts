@@ -1,6 +1,7 @@
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { ChatOpenAI } from "@langchain/openai";
+import { resolveLlmRequestTimeoutMs } from "../config/llmInvocation";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 import { getCodexCliProxyConnection } from "../platform/llm/codex";
 import { secretStore } from "../services/settings/secretStore";
@@ -103,13 +104,6 @@ function normalizeOptionalText(value: string | null | undefined): string | undef
   }
   const trimmed = value.trim();
   return trimmed || undefined;
-}
-
-function normalizeOptionalTimeoutMs(value: number | undefined): number | undefined {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
-    return undefined;
-  }
-  return Math.floor(value);
 }
 
 function normalizeProviderSecret(secret: ProviderSecret): ProviderSecret {
@@ -277,7 +271,7 @@ export async function resolveLLMClientOptions(
   }
 
   const temperature = resolveModelTemperature(resolvedProvider, model, resolvedTemperature);
-  const timeoutMs = normalizeOptionalTimeoutMs(options.timeoutMs);
+  const timeoutMs = resolveLlmRequestTimeoutMs(options.timeoutMs);
   const concurrencyLimit = normalizeLimitValue(dbSecret?.concurrencyLimit)
     || (resolvedProvider === "codex" ? 1 : 0);
   const requestIntervalMs = normalizeLimitValue(dbSecret?.requestIntervalMs);

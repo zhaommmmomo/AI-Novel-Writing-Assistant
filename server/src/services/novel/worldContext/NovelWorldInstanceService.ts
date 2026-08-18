@@ -27,7 +27,6 @@ import { listNovelWorldSyncRecords } from "./novelWorldSyncRecords";
 import { NovelWorldSyncService } from "./NovelWorldSyncService";
 import { normalizeStoryWorldSlice } from "../storyWorldSlice/storyWorldSlicePersistence";
 
-const NOVEL_THEME_WORLD_GENERATION_TIMEOUT_MS = 120_000;
 const NOVEL_THEME_WORLD_GENERATION_MAX_TOKENS = 4_800;
 
 function buildGeneratedOpeningWorldSlice(input: {
@@ -506,7 +505,6 @@ export class NovelWorldInstanceService {
         model: input.model,
         temperature: input.temperature ?? 0.5,
         maxTokens: NOVEL_THEME_WORLD_GENERATION_MAX_TOKENS,
-        timeoutMs: NOVEL_THEME_WORLD_GENERATION_TIMEOUT_MS,
         entrypoint: "novel-world-generate",
       },
     });
