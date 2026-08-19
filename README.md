@@ -154,6 +154,7 @@
 - 模型列表从本机 Claude Code CLI 动态读取，可以在厂商卡片直接刷新，刷新过程不消耗订阅额度；默认使用 `opus` 与 `max` 推理强度，需要控制消耗时可以调低推理强度。
 - Claude Code 默认单并发运行，只用于文本生成，不会出现在图片生成和知识库向量模型选项中。
 - 生成过程中取消任务时会一并停止本机 Claude Code 调用，且调用只在临时目录内运行，不会读写你的代码仓库。
+- 修复通过服务脚本后台启动时找不到 Claude Code 命令、导致刷新模型列表失败的问题。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 

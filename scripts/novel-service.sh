@@ -52,7 +52,10 @@ write_plist() {
 
   pnpm_path="$(command -v pnpm)"
   [[ "${pnpm_path}" = /* ]] || die "pnpm 必须解析为绝对路径"
-  runtime_path="$(dirname -- "${pnpm_path}"):/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+  # ${HOME}/.local/bin 是用户级 CLI 的标准安装位置，Claude Code 的官方安装器默认装在这里。
+  # launchd 不继承登录 shell 的 PATH，漏掉这一段会让 CLI 厂商在服务里报 spawn ENOENT，
+  # 而在终端里手测又完全正常。
+  runtime_path="$(dirname -- "${pnpm_path}"):${HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
 
   umask 077
   mkdir -p -- "$(dirname -- "${PLIST_PATH}")"

@@ -57,6 +57,7 @@ Claude Code 没有 `thread/read` 这类带外状态查询，watchdog 因此只�
 
 ## 失败模式
 
+- **终端里 `claude` 能跑，服务里报 `spawn claude ENOENT`**：launchd 不继承登录 shell 的 PATH，`scripts/novel-service.sh` 用的是写死的 `runtime_path`。Claude Code 官方安装器装到 `~/.local/bin`，这一段必须在 `runtime_path` 里，否则厂商在设置页刷新模型就 500。Codex 不受影响只是因为它通常装在 `/opt/homebrew/bin`。换用其他安装方式或换机器时先确认 `plutil -extract EnvironmentVariables.PATH raw ~/Library/LaunchAgents/com.ai-novel.dev.plist` 覆盖了 CLI 的真实位置，必要时用 `CLAUDE_CODE_CLI_PATH` 指定绝对路径。
 - **设置页显示 Claude Code，但连接测试失败**：先运行 `claude --version` 与 `claude auth status`（或在交互会话里 `/status`），确认本机登录仍然有效；OAuth 会话过期时 CLI 会返回 `authentication_failed`，需要重新登录。再检查 `CLAUDE_CODE_CLI_PATH`。
 - **模型不存在**：在厂商卡片刷新模型目录，选择 `list_models` 当前返回的别名或完整模型名。别名带上下文后缀时形如 `opus[1m]`，方括号是合法字符。
 - **推理强度不生效**：检查 `CLAUDE_CODE_CLI_EFFORT`。注意 `list_models` 里缺少 `supportedEffortLevels`（例如 Haiku）**不等于 `--effort` 被忽略**：实测 Haiku 配 `max` 时，一个十来字的回答仍然产生了约 4700 个输出 token。不要用这个字段判断 effort 是否起作用。
