@@ -32,6 +32,8 @@ server/.tmp/
 desktop/build/
 desktop/runtime-migration-smoke/
 server/prisma-diff-migrations-to-schema.sql
+# Local database snapshots and exported chapter prose taken before data migrations
+server/backups/
 
 # AI tool artifacts
 .claude/plan/

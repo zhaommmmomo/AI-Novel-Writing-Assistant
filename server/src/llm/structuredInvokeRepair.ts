@@ -1,12 +1,12 @@
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { toJSONSchema, type ZodError, type ZodType } from "zod";
+import type { ZodError, ZodType } from "zod";
 import type { LLMProvider } from "@ai-novel/shared/types/llm";
 import type { ModelRouteRequestProtocol } from "@ai-novel/shared/types/novel";
 import { getLLM, getResolvedLLMClientOptionsFromInstance } from "./factory";
 import { runWithEnforcedTimeout } from "./invokeTimeout";
 import { logStructuredRepairSession } from "./repairLogging";
 import type { TaskType } from "./modelRouter";
-import type { StructuredOutputStrategy } from "./structuredOutput";
+import { describeJsonSchemaForPrompt, type StructuredOutputStrategy } from "./structuredOutput";
 import { toText } from "../services/novel/novelP0Utils";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 
@@ -57,11 +57,11 @@ interface RepairHelpers<T> {
 const MAX_REPAIR_SOURCE_CHARS = 12_000;
 
 function buildRepairSchemaContract<T>(schema: ZodType<T>): string {
-  try {
-    return JSON.stringify(toJSONSchema(schema), null, 2);
-  } catch {
+  const jsonSchema = describeJsonSchemaForPrompt(schema);
+  if (!jsonSchema) {
     return "目标 Schema 无法序列化；仍须严格按照校验错误中的字段路径补齐。";
   }
+  return JSON.stringify(jsonSchema, null, 2);
 }
 
 function compactRepairSource(rawContent: string): string {

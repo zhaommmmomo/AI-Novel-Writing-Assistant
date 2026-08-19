@@ -418,6 +418,37 @@ export function buildVolumePlanningReadiness(input: {
   };
 }
 
+export interface DuplicateChapterOrder {
+  volumeId: string;
+  chapterOrder: number;
+  chapterIds: string[];
+}
+
+/**
+ * Report `(volumeId, chapterOrder)` collisions, mirroring the unique index on
+ * `VolumeChapterPlan`. A document carrying collisions cannot be persisted at all.
+ */
+export function findDuplicateChapterOrders(volumes: VolumePlan[]): DuplicateChapterOrder[] {
+  const duplicates: DuplicateChapterOrder[] = [];
+  for (const volume of volumes) {
+    const chapterIdsByOrder = new Map<number, string[]>();
+    for (const chapter of volume.chapters) {
+      const bucket = chapterIdsByOrder.get(chapter.chapterOrder);
+      if (bucket) {
+        bucket.push(chapter.id);
+        continue;
+      }
+      chapterIdsByOrder.set(chapter.chapterOrder, [chapter.id]);
+    }
+    for (const [chapterOrder, chapterIds] of chapterIdsByOrder) {
+      if (chapterIds.length > 1) {
+        duplicates.push({ volumeId: volume.id, chapterOrder, chapterIds });
+      }
+    }
+  }
+  return duplicates;
+}
+
 export function buildVolumeWorkspaceDocument(params: {
   novelId: string;
   volumes: VolumePlan[];

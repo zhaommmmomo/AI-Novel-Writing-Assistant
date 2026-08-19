@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { createLogger, defineConfig, type Logger, type ProxyOptions } from "vite";
 
 interface DesktopPackageJson {
   version?: unknown;
@@ -47,6 +47,51 @@ function resolveDevProxyTarget(): string {
   return `http://${targetHost}:${port}`;
 }
 
+/**
+ * The API needs well over a minute to boot while the client already polls `/api/health`
+ * every second, so vite prints one ECONNREFUSED stack trace per request — dozens of them —
+ * and buries everything else in the dev log. Collapse "the API is not listening yet" into a
+ * single line per outage; every other proxy error is still reported in full.
+ *
+ * Vite registers its own proxy error handler after `configure` runs, so the muting has to
+ * happen in the logger rather than on the proxy itself.
+ */
+const apiProxyOutage: { offlineSince: number | null } = { offlineSince: null };
+
+const configureApiProxy: NonNullable<ProxyOptions["configure"]> = (proxy) => {
+  proxy.on("proxyRes", () => {
+    if (apiProxyOutage.offlineSince === null) {
+      return;
+    }
+    const seconds = Math.round((Date.now() - apiProxyOutage.offlineSince) / 1000);
+    apiProxyOutage.offlineSince = null;
+    console.info(`[vite] API is reachable again after ${seconds}s.`);
+  });
+};
+
+function createDevLogger(): Logger {
+  const logger = createLogger();
+  const logError = logger.error.bind(logger);
+  logger.error = (message, options) => {
+    const code = (options?.error as NodeJS.ErrnoException | undefined)?.code;
+    const isApiBooting = message.includes("http proxy error")
+      && (code === "ECONNREFUSED" || code === "ECONNRESET");
+    if (!isApiBooting) {
+      logError(message, options);
+      return;
+    }
+    if (apiProxyOutage.offlineSince !== null) {
+      return;
+    }
+    apiProxyOutage.offlineSince = Date.now();
+    logger.warn(
+      `API at ${resolveDevProxyTarget()} is not reachable yet; further proxy errors are muted until it answers.`,
+      { timestamp: true },
+    );
+  };
+  return logger;
+}
+
 function resolveDesktopAppVersion(): string {
   const desktopPackagePath = path.resolve(__dirname, "../desktop/package.json");
   const packageJson = JSON.parse(fs.readFileSync(desktopPackagePath, "utf8")) as DesktopPackageJson;
@@ -64,6 +109,7 @@ const appVersion = resolveDesktopAppVersion();
 
 export default defineConfig({
   base: isDesktopRelativeBaseBuild ? "./" : "/",
+  customLogger: createDevLogger(),
   plugins: [react()],
   define: {
     "import.meta.env.VITE_APP_VERSION": JSON.stringify(appVersion),
@@ -99,6 +145,7 @@ export default defineConfig({
       "/api": {
         target: resolveDevProxyTarget(),
         changeOrigin: true,
+        configure: configureApiProxy,
       },
     },
   },

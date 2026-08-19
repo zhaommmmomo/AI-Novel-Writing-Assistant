@@ -12,11 +12,18 @@ const { DEFAULT_LLM_REQUEST_TIMEOUT_MS } = require("../dist/config/llmInvocation
 const { plannerIntentPrompt } = require("../dist/prompting/prompts/agent/plannerIntent.prompt.js");
 const { novelThemeWorldGenerationPrompt } = require("../dist/prompting/prompts/world/world.prompts.js");
 const {
+  payoffLedgerSyncOutputSchema,
+} = require("../dist/prompting/prompts/payoff/payoffLedgerSync.promptSchemas.js");
+const {
+  buildStructuredResponseFormat,
   classifyStructuredOutputFailure,
+  describeJsonSchemaForPrompt,
   findStrictJsonSchemaCompatibilityIssues,
+  isStructuredOutputStrategyCompatible,
   resolveStructuredOutputProfile,
   resolveStructuredOutputStrategy,
   selectStructuredOutputStrategy,
+  toJsonSchemaOrNull,
 } = require("../dist/llm/structuredOutput.js");
 
 test("supported providers include kimi, minimax, glm, qwen, gemini, codex and ollama", () => {
@@ -117,6 +124,56 @@ test("Codex downgrades the exact planner intent and novel world schemas that pre
   assert.ok(findStrictJsonSchemaCompatibilityIssues(novelThemeWorldGenerationPrompt.outputSchema).some(
     (issue) => issue.keyword === "additionalProperties",
   ));
+});
+
+test("schemas that cannot be rendered as JSON Schema downgrade instead of throwing", () => {
+  // `.transform()` on the output side makes zod refuse to emit a JSON Schema at all. The
+  // strategy resolver has to answer "not compatible" rather than let that throw escape into
+  // the caller, which used to abort payoff ledger sync with a bare conversion error.
+  const transformSchema = z.object({
+    items: z.array(z.string()).default([]).transform((items) => items.slice(0, 4)),
+  });
+
+  assert.equal(toJsonSchemaOrNull(transformSchema), null);
+  assert.ok(describeJsonSchemaForPrompt(transformSchema));
+  assert.deepEqual(
+    findStrictJsonSchemaCompatibilityIssues(transformSchema).map((issue) => issue.keyword),
+    ["schema"],
+  );
+
+  for (const provider of ["codex", "openai", "deepseek"]) {
+    const profile = resolveStructuredOutputProfile({
+      provider,
+      model: provider === "codex" ? "gpt-5.6-sol" : undefined,
+      executionMode: "structured",
+    });
+    assert.equal(isStructuredOutputStrategyCompatible({
+      profile,
+      schema: transformSchema,
+      strategy: "json_schema",
+    }), false, `${provider} should not send an unrenderable schema natively`);
+    assert.notEqual(
+      resolveStructuredOutputStrategy({ profile, schema: transformSchema, preferredStrategy: "json_schema" }),
+      "json_schema",
+      `${provider} should downgrade an unrenderable schema`,
+    );
+  }
+
+  assert.equal(buildStructuredResponseFormat({
+    strategy: "json_schema",
+    schema: transformSchema,
+    label: "unrenderable",
+  }), undefined);
+});
+
+test("the payoff ledger sync schema no longer aborts strategy selection", () => {
+  const profile = resolveStructuredOutputProfile({
+    provider: "codex",
+    model: "gpt-5.6-sol",
+    executionMode: "structured",
+  });
+
+  assert.equal(selectStructuredOutputStrategy(profile, payoffLedgerSyncOutputSchema), "prompt_json");
 });
 
 test("LLM clients use a long shared timeout while preserving explicit overrides", { concurrency: false }, async () => {

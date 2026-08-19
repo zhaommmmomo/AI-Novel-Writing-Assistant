@@ -2,7 +2,6 @@ import type {
   StorylineDiff,
   StorylineVersion,
   VolumeImpactResult,
-  VolumeChapterPlan,
   VolumePlan,
   VolumePlanDiff,
   VolumePlanDocument,
@@ -46,7 +45,12 @@ import {
   listStorylineVersionsCompat,
 } from "./volumeStorylineCompat";
 import {
+  applyMirroredChapterToVolumes,
+  hydrateVolumesFromCanonicalChapters,
+} from "./volumeChapterMirror";
+import {
   buildVolumeWorkspaceDocument,
+  findDuplicateChapterOrders,
   mergeVolumeWorkspaceInput,
   normalizeVolumeWorkspaceDocument,
   serializeVolumeWorkspaceDocument,
@@ -110,47 +114,18 @@ export class NovelVolumeService {
         sceneCards: true,
       },
     });
-    if (chapterRows.length === 0) {
+    const hydrated = hydrateVolumesFromCanonicalChapters(document.volumes, chapterRows);
+    if (hydrated.orderConflict) {
+      console.warn("[volume.workspace] canonical chapter orders skipped to avoid duplicate chapterOrder", {
+        novelId,
+        workspaceChapterCount: document.volumes.reduce((sum, volume) => sum + volume.chapters.length, 0),
+        chapterRowCount: chapterRows.length,
+      });
+    }
+    if (!hydrated.changed) {
       return { document, changed: false };
     }
-
-    const chapterById = new Map(chapterRows.map((row) => [row.id, row] as const));
-    const chapterByOrder = new Map(chapterRows.map((row) => [row.order, row] as const));
-    let changed = false;
-    const volumes = document.volumes.map((volume) => {
-      const chapters = volume.chapters.map((chapter) => {
-        const row = chapter.chapterId
-          ? chapterById.get(chapter.chapterId) ?? chapterByOrder.get(chapter.chapterOrder)
-          : chapterByOrder.get(chapter.chapterOrder);
-        if (!row) {
-          return chapter;
-        }
-        const conflictLevelSource: VolumeChapterPlan["conflictLevelSource"] = chapter.conflictLevelSource === "user" ? "user" : "ai";
-        const nextChapter = {
-          ...chapter,
-          chapterId: row.id,
-          chapterOrder: row.order,
-          title: row.title,
-          summary: row.expectation?.trim() || chapter.summary,
-          targetWordCount: row.targetWordCount ?? null,
-          conflictLevel: chapter.conflictLevelSource === "user"
-            ? chapter.conflictLevel ?? null
-            : row.conflictLevel ?? null,
-          conflictLevelSource,
-          revealLevel: row.revealLevel ?? null,
-          mustAvoid: row.mustAvoid ?? null,
-          taskSheet: row.taskSheet ?? null,
-          sceneCards: row.sceneCards ?? null,
-        };
-        if (JSON.stringify(nextChapter) !== JSON.stringify(chapter)) {
-          changed = true;
-        }
-        return nextChapter;
-      });
-      return changed ? { ...volume, chapters } : volume;
-    });
-
-    return { document: changed ? { ...document, volumes } : document, changed };
+    return { document: { ...document, volumes: hydrated.volumes }, changed: true };
   }
 
   async mirrorChapterIntoWorkspace(
@@ -169,42 +144,20 @@ export class NovelVolumeService {
     },
   ): Promise<void> {
     const document = await this.ensureVolumeWorkspace(novelId);
-    let changed = false;
-    const nextVolumes = document.volumes.map((volume) => {
-      const chapters = volume.chapters.map((item) => {
-        const matchesChapter = chapter.id
-          ? item.chapterId === chapter.id || item.chapterOrder === chapter.order
-          : item.chapterOrder === chapter.order;
-        if (!matchesChapter) {
-          return item;
-        }
-        changed = true;
-        const conflictLevelSource: VolumeChapterPlan["conflictLevelSource"] = item.conflictLevelSource === "user" ? "user" : "ai";
-        return {
-          ...item,
-          chapterId: chapter.id ?? item.chapterId ?? null,
-          chapterOrder: chapter.order,
-          title: chapter.title,
-          summary: chapter.expectation?.trim() || item.summary,
-          targetWordCount: chapter.targetWordCount ?? null,
-          conflictLevel: item.conflictLevelSource === "user"
-            ? item.conflictLevel ?? null
-            : chapter.conflictLevel ?? null,
-          conflictLevelSource,
-          revealLevel: chapter.revealLevel ?? null,
-          mustAvoid: chapter.mustAvoid ?? null,
-          taskSheet: chapter.taskSheet ?? null,
-          sceneCards: chapter.sceneCards ?? null,
-        };
+    const mirrored = applyMirroredChapterToVolumes(document.volumes, chapter);
+    if (mirrored.orderConflict) {
+      console.warn("[volume.workspace] mirrored chapter order kept to avoid duplicate chapterOrder", {
+        novelId,
+        chapterId: chapter.id ?? null,
+        chapterOrder: chapter.order,
       });
-      return changed ? { ...volume, chapters } : volume;
-    });
-    if (!changed) {
+    }
+    if (!mirrored.changed) {
       return;
     }
     await this.persistWorkspaceDocument(novelId, {
       ...document,
-      volumes: nextVolumes,
+      volumes: mirrored.volumes,
     }, {
       emitEvent: false,
       syncPayoffLedger: false,
@@ -222,6 +175,35 @@ export class NovelVolumeService {
     void payoffLedgerSyncService.syncLedger(novelId).catch(() => null);
   }
 
+  /**
+   * Last line of defence before writing the workspace: `VolumeChapterPlan` has a unique index
+   * on `(volumeId, chapterOrder)`, so a document carrying duplicate orders fails the whole
+   * transaction and takes every workspace read down with it. Rebuilding the document reuses
+   * the draft normalizer, which renumbers colliding chapters and recomputes the derived
+   * outline, so persistence stays possible while the warning keeps the drift visible.
+   */
+  private repairDuplicateChapterOrders(novelId: string, document: VolumePlanDocument): VolumePlanDocument {
+    const duplicates = findDuplicateChapterOrders(document.volumes);
+    if (duplicates.length === 0) {
+      return document;
+    }
+    console.warn("[volume.workspace] duplicate chapterOrder repaired before persist", {
+      novelId,
+      duplicates: duplicates.slice(0, 10),
+      duplicateCount: duplicates.length,
+    });
+    return buildVolumeWorkspaceDocument({
+      novelId,
+      volumes: document.volumes,
+      strategyPlan: document.strategyPlan,
+      critiqueReport: document.critiqueReport,
+      beatSheets: document.beatSheets,
+      rebalanceDecisions: document.rebalanceDecisions,
+      source: document.source,
+      activeVersionId: document.activeVersionId,
+    });
+  }
+
   private async persistWorkspaceDocument(
     novelId: string,
     document: VolumePlanDocument,
@@ -232,6 +214,7 @@ export class NovelVolumeService {
       memoryTelemetry?: VolumeMemoryTelemetry;
     } = {},
   ): Promise<VolumePlanDocument> {
+    const safeDocument = this.repairDuplicateChapterOrders(novelId, document);
     logMemoryUsage({
       event: "before_write",
       component: "persistWorkspaceDocument",
@@ -243,14 +226,14 @@ export class NovelVolumeService {
       entrypoint: options.memoryTelemetry?.entrypoint,
       volumeId: options.memoryTelemetry?.volumeId,
       chapterId: options.memoryTelemetry?.chapterId,
-      volumeCount: document.volumes.length,
-      chapterCount: document.volumes.reduce((sum, volume) => sum + volume.chapters.length, 0),
-      beatSheetCount: document.beatSheets.length,
+      volumeCount: safeDocument.volumes.length,
+      chapterCount: safeDocument.volumes.reduce((sum, volume) => sum + volume.chapters.length, 0),
+      beatSheetCount: safeDocument.beatSheets.length,
     });
     const persistedDocument = await runVolumeWorkspaceTransaction(async (tx) => {
-      const { versionId } = await this.ensureActiveVersionRecord(tx, novelId, document);
+      const { versionId } = await this.ensureActiveVersionRecord(tx, novelId, safeDocument);
       const nextDocument = {
-        ...document,
+        ...safeDocument,
         activeVersionId: versionId,
         source: "volume" as const,
       };

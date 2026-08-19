@@ -372,11 +372,48 @@ function collectStrictJsonSchemaCompatibilityIssues(
   }
 }
 
+/**
+ * `toJSONSchema` throws for schemas zod cannot represent — most commonly an output-side
+ * `.transform()`. Such a schema simply cannot be sent as a native JSON Schema, so callers
+ * need a verdict rather than an exception escaping into the caller's business logic.
+ */
+export function toJsonSchemaOrNull<T>(schema: ZodType<T>): Record<string, unknown> | null {
+  try {
+    return toJSONSchema(schema) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A best-effort JSON Schema rendering for prompt text, where an approximate contract still
+ * helps the model. Unrepresentable parts degrade to "any" instead of failing outright.
+ */
+export function describeJsonSchemaForPrompt<T>(schema: ZodType<T>): Record<string, unknown> | null {
+  const strict = toJsonSchemaOrNull(schema);
+  if (strict) {
+    return strict;
+  }
+  try {
+    return toJSONSchema(schema, { unrepresentable: "any" }) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export function findStrictJsonSchemaCompatibilityIssues<T>(
   schema: ZodType<T>,
 ): StrictJsonSchemaCompatibilityIssue[] {
+  const jsonSchema = toJsonSchemaOrNull(schema);
+  if (!jsonSchema) {
+    return [{
+      path: "$",
+      keyword: "schema",
+      message: "Schema cannot be represented as JSON Schema.",
+    }];
+  }
   const issues: StrictJsonSchemaCompatibilityIssue[] = [];
-  collectStrictJsonSchemaCompatibilityIssues(toJSONSchema(schema), "$", issues);
+  collectStrictJsonSchemaCompatibilityIssues(jsonSchema, "$", issues);
   return issues;
 }
 
@@ -387,6 +424,9 @@ export function isStructuredOutputStrategyCompatible<T>(input: {
 }): boolean {
   if (input.strategy === "prompt_json") {
     return true;
+  }
+  if (input.strategy === "json_schema" && !toJsonSchemaOrNull(input.schema)) {
+    return false;
   }
   if (input.profile.family !== "codex_cli") {
     return true;
@@ -452,12 +492,18 @@ export function buildStructuredResponseFormat<T>(input: {
     return { type: "json_object" };
   }
   if (input.strategy === "json_schema") {
+    const jsonSchema = toJsonSchemaOrNull(input.schema);
+    // Unreachable once the strategy passed isStructuredOutputStrategyCompatible; falling back
+    // to prompt-driven JSON still beats throwing from inside the invoke path.
+    if (!jsonSchema) {
+      return undefined;
+    }
     return {
       type: "json_schema",
       json_schema: {
         name: sanitizeSchemaName(input.label),
         strict: true,
-        schema: toJSONSchema(input.schema),
+        schema: jsonSchema,
       },
     };
   }
