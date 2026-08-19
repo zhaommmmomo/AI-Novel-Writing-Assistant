@@ -11,6 +11,7 @@ import {
   getProviderEnvBaseUrl,
   getProviderEnvModel,
   isBuiltInProvider,
+  isCliBackedProvider,
   providerRequiresApiKey,
   PROVIDERS,
   SUPPORTED_PROVIDERS,
@@ -229,7 +230,7 @@ function buildBuiltInProviderStatus(
     isConfigured,
     isActive: item?.isActive ?? isConfigured,
     reasoningEnabled: item?.reasoningEnabled ?? true,
-    concurrencyLimit: normalizeProviderLimit(item?.concurrencyLimit) || (provider === "codex" ? 1 : 0),
+    concurrencyLimit: normalizeProviderLimit(item?.concurrencyLimit) || (isCliBackedProvider(provider) ? 1 : 0),
     requestIntervalMs: normalizeProviderLimit(item?.requestIntervalMs),
     supportsImageGeneration: Boolean(currentImageModel),
   };

@@ -164,6 +164,10 @@ export function getJsonCapability(provider: LLMProvider, model?: string, baseURL
       supportsJsonObject: true,
       supportsJsonSchema: true,
     },
+    claudeCode: {
+      supportsJsonObject: true,
+      supportsJsonSchema: true,
+    },
   };
 
   const cap = isBuiltinLLMProvider(provider) ? jsonCapabilities[provider] : undefined;

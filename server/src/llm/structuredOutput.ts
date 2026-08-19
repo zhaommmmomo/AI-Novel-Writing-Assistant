@@ -177,6 +177,17 @@ export function resolveStructuredOutputProfile(input: {
       preferredStructuredStrategy: "json_schema",
     });
   }
+  if (input.provider === "claudeCode") {
+    // Claude Code validates the model output against the supplied schema and retries locally
+    // instead of rejecting non-strict schemas up front, so this family skips the strict
+    // additionalProperties/required gate that Codex needs.
+    return buildProfile({
+      family: "claude_code_cli",
+      nativeJsonSchema: true,
+      nativeJsonObject: true,
+      preferredStructuredStrategy: "json_schema",
+    });
+  }
   if (input.provider === "gemini" || GEMINI_HOST_PATTERN.test(host)) {
     return buildProfile({
       family: "gemini",

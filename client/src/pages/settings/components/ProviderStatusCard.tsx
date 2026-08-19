@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import { isCliBackedLLMProvider, type LLMProvider } from "@ai-novel/shared/types/llm";
 import type { APIKeyStatus, ProviderBalanceStatus } from "@/api/settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,8 @@ function getBalanceSummary(input: {
   isBalanceLoading: boolean;
 }) {
   const { provider, balance, isBalanceLoading } = input;
-  if (provider.provider === "codex") {
-    return "复用本机 Codex 登录，不需要单独查询 API 余额。";
+  if (isCliBackedLLMProvider(provider.provider)) {
+    return `复用本机 ${provider.name} 登录，不需要单独查询 API 余额。`;
   }
   if (provider.kind === "custom") {
     return "自定义厂商暂不接入余额查询。";
@@ -178,15 +178,15 @@ export default function ProviderStatusCard(props: {
       {advancedOpen ? (
         <div className="mt-3 space-y-3">
           <div className={`text-xs text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
-            {provider.provider === "codex"
-              ? "连接方式：本机 Codex CLI"
+            {isCliBackedLLMProvider(provider.provider)
+              ? `连接方式：本机 ${provider.name}`
               : `API 地址：${provider.currentBaseURL || "-"}`}
           </div>
           <ProviderRequestLimitSummary
             concurrencyLimit={provider.concurrencyLimit}
             requestIntervalMs={provider.requestIntervalMs}
           />
-          {provider.provider !== "codex" ? <div className="flex flex-col gap-3 rounded-md border bg-background/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+          {!isCliBackedLLMProvider(provider.provider) ? <div className="flex flex-col gap-3 rounded-md border bg-background/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0 space-y-1">
               <div className="text-xs font-medium text-muted-foreground">思考功能</div>
               <div className={`text-xs text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
@@ -212,9 +212,11 @@ export default function ProviderStatusCard(props: {
                 <Badge variant="outline">最近刷新 {formatBalanceTime(balance.fetchedAt)}</Badge>
               ) : null}
             </div>
-            {provider.provider === "codex" ? (
+            {isCliBackedLLMProvider(provider.provider) ? (
               <div className={`text-sm text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>
-                Codex 使用 ChatGPT 登录或本机配置的 Codex Proxy，不提供 API 余额查询。
+                {provider.provider === "codex"
+                  ? "Codex 使用 ChatGPT 登录或本机配置的 Codex Proxy，不提供 API 余额查询。"
+                  : "Claude Code 使用本机 Claude 订阅登录或已配置的 API Key，不提供 API 余额查询。"}
               </div>
             ) : provider.kind === "custom" ? (
               <div className={`text-sm text-muted-foreground ${AUTO_DIRECTOR_MOBILE_CLASSES.wrapText}`}>

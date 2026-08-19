@@ -12,6 +12,8 @@ Codex 作为内置文本厂商接入，但不直接改写每条业务调用链�
 
 选择 `app-server` 而不是为每次请求执行独立的 `codex exec`，原因是长篇生产会连续发起大量模型调用。复用单个 app-server 进程可以保留流式事件和模型目录能力，减少重复进程启动成本，同时每次生成仍创建 `ephemeral` thread，不保存小说提示词会话。
 
+本地 OpenAI 兼容桥接层现在由 `server/src/platform/llm/cliBridge/` 提供，Codex 与 Claude Code CLI 共用。Codex 侧只保留一个实现 `CliTextGenerator` 的 app-server 客户端和厂商身份描述（错误文案、`owned_by`）。新增同类 CLI 厂商时应实现同一接口，不要再复制一份 HTTP 桥接。
+
 ## 当前规则
 
 - 内置 provider id 固定为 `codex`，只用于文本生成，不参与图片生成或 Embedding/RAG 厂商列表。
@@ -68,6 +70,7 @@ Codex 调用不能只依赖业务任务的 `heartbeatAt` 判断健康。业务�
 ## 相关模块
 
 - `server/src/platform/llm/codex/`
+- `server/src/platform/llm/cliBridge/`
 - `server/src/llm/factory.ts`
 - `server/src/llm/modelCatalog.ts`
 - `server/src/llm/structuredOutput.ts`
@@ -76,6 +79,7 @@ Codex 调用不能只依赖业务任务的 `heartbeatAt` 判断健康。业务�
 
 ## 来源文档
 
+- [Claude Code CLI 文本模型适配边界](./claude-code-cli-provider.md)
 - [当前模型选择与厂商默认模型边界](./model-selection.md)
 - [配置项归属与可见性规范](./configuration-conventions.md)
 - [项目协作规则](../../../AGENTS.md)

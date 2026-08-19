@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiResponse } from "@ai-novel/shared/types/api";
-import type { LLMProvider } from "@ai-novel/shared/types/llm";
+import { isCliBackedLLMProvider, type LLMProvider } from "@ai-novel/shared/types/llm";
 import {
   type APIKeyStatus,
   createCustomProvider,
@@ -399,7 +399,7 @@ export default function SettingsPage() {
     || (!isCustomDialog && editingConfig?.requiresApiKey !== false && !form.key.trim() && !editingConfig?.isConfigured);
   const providerSubmitLabel = isSavingProvider ? "保存中..." : isCreatingCustomProvider ? "创建厂商" : "保存";
 
-  const isCodexDialog = editingConfig?.provider === "codex";
+  const isCliProviderDialog = isCliBackedLLMProvider(editingConfig?.provider ?? "");
 
   return (
     <div className={AUTO_DIRECTOR_MOBILE_CLASSES.settingsPageRoot}>
@@ -458,7 +458,7 @@ export default function SettingsPage() {
         submitDisabled={providerSubmitDisabled}
         submitLabel={providerSubmitLabel}
         onTest={handleTestProviderDialog}
-        testDisabled={testMutation.isPending || !form.model.trim() || (!isCodexDialog && !form.baseURL.trim())}
+        testDisabled={testMutation.isPending || !form.model.trim() || (!isCliProviderDialog && !form.baseURL.trim())}
         testResult={dialogTestResult}
         onDeleteCustomProvider={handleDeleteCustomProvider}
         deleteDisabled={deleteCustomProviderMutation.isPending}

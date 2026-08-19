@@ -4,6 +4,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { resolveLlmRequestTimeoutMs } from "../config/llmInvocation";
 import type { PromptInvocationMeta } from "../prompting/core/promptTypes";
 import { getCodexCliProxyConnection } from "../platform/llm/codex";
+import { getClaudeCodeCliProxyConnection } from "../platform/llm/claudeCode";
 import { secretStore } from "../services/settings/secretStore";
 import { resolveModelTemperature } from "./capabilities";
 import { createAnthropicLLM } from "./anthropicClient";
@@ -23,6 +24,7 @@ import {
   getProviderEnvApiKey,
   getProviderEnvModel,
   isBuiltInProvider,
+  isCliBackedProvider,
   providerRequiresApiKey,
   PROVIDERS,
   resolveProviderBaseUrl,
@@ -261,8 +263,12 @@ export async function resolveLLMClientOptions(
     options.baseURL ?? dbSecret?.baseURL,
     dbSecret?.baseURL,
   );
-  if (resolvedProvider === "codex") {
-    const connection = await getCodexCliProxyConnection();
+  if (resolvedProvider === "codex" || resolvedProvider === "claudeCode") {
+    // CLI-backed providers ignore any saved key/URL: the only reachable endpoint is this
+    // process's loopback bridge, authenticated with an in-memory token.
+    const connection = resolvedProvider === "codex"
+      ? await getCodexCliProxyConnection()
+      : await getClaudeCodeCliProxyConnection();
     apiKey = connection.apiKey;
     baseURL = connection.baseURL;
   }
@@ -273,7 +279,7 @@ export async function resolveLLMClientOptions(
   const temperature = resolveModelTemperature(resolvedProvider, model, resolvedTemperature);
   const timeoutMs = resolveLlmRequestTimeoutMs(options.timeoutMs);
   const concurrencyLimit = normalizeLimitValue(dbSecret?.concurrencyLimit)
-    || (resolvedProvider === "codex" ? 1 : 0);
+    || (isCliBackedProvider(resolvedProvider) ? 1 : 0);
   const requestIntervalMs = normalizeLimitValue(dbSecret?.requestIntervalMs);
   const requestProtocol = options.requestProtocol === "anthropic" ? "anthropic" : "openai_compatible";
   const structuredStrategy = options.structuredStrategy;

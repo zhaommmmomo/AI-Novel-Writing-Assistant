@@ -1,5 +1,5 @@
-import { isBuiltinLLMProvider, type LLMProvider } from "@ai-novel/shared/types/llm";
-import { SUPPORTED_EMBEDDING_PROVIDERS } from "../llm/providers";
+import { LLM_PROVIDERS, type LLMProvider } from "@ai-novel/shared/types/llm";
+import { isCliBackedProvider, SUPPORTED_EMBEDDING_PROVIDERS } from "../llm/providers";
 
 export type EmbeddingProvider = LLMProvider;
 
@@ -56,9 +56,11 @@ export function asEmbeddingProvider(rawValue: string | undefined): EmbeddingProv
     return DEFAULT_EMBEDDING_PROVIDER;
   }
 
-  const normalizedBuiltin = trimmed.toLowerCase();
-  if (isBuiltinLLMProvider(normalizedBuiltin)) {
-    return normalizedBuiltin === "codex" ? DEFAULT_EMBEDDING_PROVIDER : normalizedBuiltin;
+  // Built-in ids are matched case-insensitively so a mis-cased value cannot silently become a
+  // custom provider. CLI-backed providers are text-only and never serve embeddings.
+  const builtin = LLM_PROVIDERS.find((provider) => provider.toLowerCase() === trimmed.toLowerCase());
+  if (builtin) {
+    return isCliBackedProvider(builtin) ? DEFAULT_EMBEDDING_PROVIDER : builtin;
   }
 
   return trimmed;

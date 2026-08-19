@@ -1,6 +1,7 @@
 import {
   LLM_PROVIDERS,
   isBuiltinLLMProvider,
+  isCliBackedLLMProvider,
   type BuiltinLLMProvider,
   type LLMProvider,
 } from "@ai-novel/shared/types/llm";
@@ -148,11 +149,25 @@ export const PROVIDERS: Record<BuiltinLLMProvider, ProviderConfig> = {
     envModelKey: "CODEX_CLI_MODEL",
     requiresApiKey: false,
   },
+  claudeCode: {
+    name: "Claude Code CLI",
+    baseURL: "claude-code-cli://local",
+    defaultModel: "opus",
+    // First-render and offline fallback only; the live catalog comes from the CLI `list_models`
+    // control request, which returns the aliases the local login can actually use.
+    models: ["opus", "opus[1m]", "sonnet", "haiku", "default"],
+    envModelKey: "CLAUDE_CODE_CLI_MODEL",
+    requiresApiKey: false,
+  },
 };
+
+export function isCliBackedProvider(provider: LLMProvider): boolean {
+  return isCliBackedLLMProvider(provider);
+}
 
 export const SUPPORTED_PROVIDERS: BuiltinLLMProvider[] = [...LLM_PROVIDERS];
 export const SUPPORTED_EMBEDDING_PROVIDERS: BuiltinLLMProvider[] = SUPPORTED_PROVIDERS
-  .filter((provider) => provider !== "codex");
+  .filter((provider) => !isCliBackedLLMProvider(provider));
 
 export function isBuiltInProvider(provider: string): provider is BuiltinLLMProvider {
   return isBuiltinLLMProvider(provider);

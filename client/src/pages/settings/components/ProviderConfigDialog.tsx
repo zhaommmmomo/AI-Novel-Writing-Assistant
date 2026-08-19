@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { isCliBackedLLMProvider } from "@ai-novel/shared/types/llm";
 import type { APIKeyStatus } from "@/api/settings";
 import SearchableSelect from "@/components/common/SearchableSelect";
 import { Button } from "@/components/ui/button";
@@ -63,13 +64,14 @@ export default function ProviderConfigDialog({
   deleteDisabled,
   deleteLabel,
 }: ProviderConfigDialogProps) {
-  const isCodexDialog = editingConfig?.provider === "codex";
+  const isCliProviderDialog = isCliBackedLLMProvider(editingConfig?.provider ?? "");
+  const cliProviderName = editingConfig?.name ?? "本机 CLI";
   const primaryModelLabel = isCreatingCustomProvider ? "默认模型（可选）" : isCustomDialog ? "默认模型" : "模型名称";
   const canSelectListedModels = selectableModels.length > 0;
   const imageModelOptions = editingConfig?.imageModels ?? [];
   const canSelectImageModels = imageModelOptions.length > 0;
-  const modelGuidance = isCodexDialog
-    ? "模型列表来自本机 Codex CLI；选择后，文本生成会复用 Codex 的登录状态。"
+  const modelGuidance = isCliProviderDialog
+    ? `模型列表来自本机 ${cliProviderName}；选择后，文本生成会复用它的登录状态。`
     : editingConfig?.provider === "deepseek"
     ? "推荐使用 DeepSeek V4 Flash，兼顾中文长篇质量与响应速度；也可以选择其他可用模型。"
     : isCreatingCustomProvider
@@ -124,9 +126,9 @@ export default function ProviderConfigDialog({
             </div>
           ) : null}
 
-          {isCodexDialog ? (
+          {isCliProviderDialog ? (
             <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
-              使用本机 Codex CLI 登录，不需要填写 API Key 或 API 地址。Codex 只用于文本生成，不提供图片和向量模型。
+              使用本机 {cliProviderName} 登录，不需要填写 API Key 或 API 地址。它只用于文本生成，不提供图片和向量模型。
             </div>
           ) : (isCustomDialog || editingConfig?.requiresApiKey === false) ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -134,7 +136,7 @@ export default function ProviderConfigDialog({
             </div>
           ) : null}
 
-          {!isCodexDialog ? (
+          {!isCliProviderDialog ? (
             <Input
               type="password"
               value={form.key}
@@ -148,7 +150,7 @@ export default function ProviderConfigDialog({
             />
           ) : null}
 
-          {!isCodexDialog ? <div className="space-y-1">
+          {!isCliProviderDialog ? <div className="space-y-1">
             <div className="text-xs text-muted-foreground">API 地址</div>
             <Input
               value={form.baseURL}
@@ -214,7 +216,7 @@ export default function ProviderConfigDialog({
             onChange={(event) => setForm((prev) => ({ ...prev, model: event.target.value }))}
           />
 
-          {!isCodexDialog ? <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+          {!isCliProviderDialog ? <div className="space-y-3 rounded-md border bg-muted/20 p-3">
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">图像模型（可选）</div>
               <div className="text-xs text-muted-foreground">

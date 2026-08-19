@@ -85,3 +85,42 @@ export function resolveCodexInvocationWatchdogConfig(): CodexInvocationWatchdogC
     maxProbeFailures,
   };
 }
+
+export const DEFAULT_CLAUDE_CODE_WATCHDOG_INTERVAL_MS = 15_000;
+export const DEFAULT_CLAUDE_CODE_STALL_TIMEOUT_MS = 10 * 60 * 1000;
+
+/**
+ * Claude Code CLI has no out-of-band thread-status query, so its watchdog only tracks stdout
+ * activity and two timeouts instead of Codex's `thread/read` probe loop.
+ */
+export interface ClaudeCodeInvocationWatchdogConfig {
+  intervalMs: number;
+  stallTimeoutMs: number;
+  hardTimeoutMs: number;
+}
+
+export function resolveClaudeCodeInvocationWatchdogConfig(): ClaudeCodeInvocationWatchdogConfig {
+  const hardTimeoutMs = parseEnvDuration(
+    process.env.CLAUDE_CODE_CLI_WATCHDOG_HARD_TIMEOUT_MS,
+    resolveLlmRequestTimeoutMs(),
+    MIN_LLM_REQUEST_TIMEOUT_MS,
+    MAX_LLM_REQUEST_TIMEOUT_MS,
+  );
+  const intervalMs = parseEnvDuration(
+    process.env.CLAUDE_CODE_CLI_WATCHDOG_INTERVAL_MS,
+    DEFAULT_CLAUDE_CODE_WATCHDOG_INTERVAL_MS,
+    1_000,
+    60_000,
+  );
+  const stallTimeoutMs = parseEnvDuration(
+    process.env.CLAUDE_CODE_CLI_STALL_TIMEOUT_MS,
+    Math.min(DEFAULT_CLAUDE_CODE_STALL_TIMEOUT_MS, hardTimeoutMs),
+    intervalMs * 2,
+    hardTimeoutMs,
+  );
+  return {
+    intervalMs,
+    stallTimeoutMs,
+    hardTimeoutMs,
+  };
+}

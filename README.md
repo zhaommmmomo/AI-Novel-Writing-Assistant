@@ -147,13 +147,13 @@
 
 ## 最新更新
 
-### 2026-08-18
+### 2026-08-19
 
-- 文本模型默认可等待 20 分钟，世界生成和复杂结构化规划不会再因为固定 2 分钟限制过早失败。
-- Codex 长任务会通过 CLI 状态判断模型是否仍在处理，只有持续停滞、控制面异常或达到绝对上限时才中断。
-- 取消 Codex 请求时会确保对应后台 turn 一并停止，避免取消后仍长期占用模型调用槽位。
-- Codex 会在发送前检查结构化 schema 是否兼容，不兼容时自动改用提示词 JSON，避免意图理解和世界生成被 `invalid_json_schema` 中断。
-- Codex provider 默认继承本机用户级配置，并保留自定义 provider id 的大小写，避免公司 Proxy 被误切换成内置 ChatGPT provider。
+- 模型设置新增 Claude Code CLI，可直接复用本机 Claude Code 的登录，不需要填写模型 API Key 或 API 地址。
+- Claude Code 可以参与自动导演、正文生成、审阅、修复和结构化规划，现有小说生产流程无需切换到独立工具。
+- 模型列表从本机 Claude Code CLI 动态读取，可以在厂商卡片直接刷新，刷新过程不消耗订阅额度；默认使用 `opus` 与 `max` 推理强度，需要控制消耗时可以调低推理强度。
+- Claude Code 默认单并发运行，只用于文本生成，不会出现在图片生成和知识库向量模型选项中。
+- 生成过程中取消任务时会一并停止本机 Claude Code 调用，且调用只在临时目录内运行，不会读写你的代码仓库。
 
 完整历史更新见 [docs/releases/release-notes.md](./docs/releases/release-notes.md)。
 

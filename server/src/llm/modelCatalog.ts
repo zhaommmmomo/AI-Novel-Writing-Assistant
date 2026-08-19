@@ -6,6 +6,7 @@ import {
   resolveProviderBaseUrl,
 } from "./providers";
 import { listCodexCliModels } from "../platform/llm/codex";
+import { listClaudeCodeCliModels } from "../platform/llm/claudeCode";
 
 interface ModelCacheItem {
   models: string[];
@@ -169,6 +170,13 @@ async function fetchProviderModels(
     const models = await listCodexCliModels();
     if (models.length === 0) {
       throw new Error("Codex CLI 没有返回可用模型。");
+    }
+    return models;
+  }
+  if (provider === "claudeCode") {
+    const models = await listClaudeCodeCliModels();
+    if (models.length === 0) {
+      throw new Error("Claude Code CLI 没有返回可用模型。");
     }
     return models;
   }
